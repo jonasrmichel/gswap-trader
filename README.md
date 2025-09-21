@@ -1,24 +1,77 @@
-# GSwap Trader
+# 🤖💎 GSwap Trader
 
-> An intelligent automated trading agent for GSwap DEX with configurable strategies, risk management, and real-time monitoring.
+<div align="center">
 
-## Features
+```ascii
+        🌟
+       ╱ ╲
+      ╱   ╲
+     ╱ 🤖  ╲
+    ╱   $   ╲
+   ╱  GSWAP  ╲
+  ╱___________╲
+  │ ┌─────┐  │
+  │ │ BUY │  │
+  │ └─────┘  │
+  │ ┌─────┐  │
+  │ │SELL │  │
+  │ └─────┘  │
+  │ 📊 📈 💰 │
+  └───────────┘
+    ⚡ 24/7 ⚡
+```
 
-- **Automated Trading**: Autonomous trading based on configurable heuristics
-- **Multiple Strategies**: Trend following, mean reversion, and range trading
-- **Risk Management**: Configurable risk levels (safe, balanced, aggressive)
-- **Paper Trading**: Test strategies with simulated funds before going live
-- **Live Trading**: Execute real trades using connected wallet
-- **Wallet Integration**: Support for private key, MetaMask, and demo wallets
-- **Real-time Monitoring**: Live activity logs and performance statistics
-- **Configurable Parameters**:
-  - Risk level (position size, stop loss)
-  - Strategy type (trend, revert, range)
-  - Trading speed (1m, 5m, 15m intervals)
-  - Signal confidence thresholds
-  - Market bias (bullish, neutral, bearish)
+**Your Automated Trading Companion for GSwap DEX**
 
-## Installation
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![SvelteKit](https://img.shields.io/badge/SvelteKit-5.0-FF3E00.svg)](https://kit.svelte.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6.svg)](https://www.typescriptlang.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-06B6D4.svg)](https://tailwindcss.com/)
+
+</div>
+
+## 🎯 Overview
+
+GSwap Trader is an intelligent automated trading agent for the GSwap decentralized exchange. It combines advanced trading strategies with real-time market analysis to execute trades 24/7, all wrapped in a beautiful dark-themed interface.
+
+## ✨ Features
+
+### 🎮 Trading Modes
+- **📝 Paper Trading** - Practice with virtual funds ($500 default)
+- **💰 Live Trading** - Trade with real funds via MetaMask
+- **🔄 Seamless Switching** - Toggle between modes anytime
+
+### 📊 Trading Strategies
+- **📈 Trend Following** - Ride the momentum with SMA crossovers
+- **🔄 Mean Reversion** - Trade market extremes with Bollinger Bands
+- **📏 Range Trading** - Profit from support/resistance levels
+
+### ⚙️ Risk Profiles
+- **🛡️ Safe** - Conservative approach (15% position, 3% stop loss)
+- **⚖️ Balanced** - Moderate risk/reward (30% position, 5% stop loss)
+- **🚀 Aggressive** - High risk/reward (60% position, 15% stop loss)
+
+### 🌐 Real-Time Features
+- **💹 Live Prices** - CoinGecko integration for real-time token prices
+- **🦊 MetaMask Integration** - Secure wallet connection
+- **📱 Toast Notifications** - Real-time trading alerts
+- **📈 Live Statistics** - Track P&L, win rate, and performance
+- **🔍 Pool Search** - Find and select trading pairs easily
+
+### 🎨 User Interface
+- **🌙 Dark Theme** - Easy on the eyes for extended trading sessions
+- **✨ Glassmorphic Design** - Modern, sleek interface
+- **📱 Responsive Layout** - Works on all devices
+- **🔒 Trading Lockdown** - Prevents config changes during active trading
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Node.js 18+ and npm
+- MetaMask browser extension
+- Some crypto for trading (or use paper trading mode)
+
+### Installation
 
 ```bash
 # Clone the repository
@@ -28,111 +81,91 @@ cd gswap-trader
 # Install dependencies
 npm install
 
-# Copy environment variables
-cp .env.example .env
-
-# Start development server
+# Start the development server
 npm run dev
 ```
 
-## Configuration
+The app will be available at `http://localhost:4000`
 
-### Trading Configuration
-
-The agent supports multiple configuration options:
-
-- **Risk Levels**:
-  - Safe: 10% position size, 2% stop loss
-  - Balanced: 25% position size, 5% stop loss
-  - Aggressive: 50% position size, 10% stop loss
-
-- **Strategies**:
-  - Trend Following: Follows market momentum
-  - Mean Reversion: Trades against extreme movements
-  - Range Trading: Trades within established ranges
-
-- **Trading Speed**:
-  - Fast: 1-minute intervals
-  - Normal: 5-minute intervals
-  - Slow: 15-minute intervals
-
-- **Signal Confidence**:
-  - Precise: >80% confidence required
-  - Normal: >60% confidence required
-  - Active: >40% confidence required
-
-### Wallet Setup
-
-1. **Demo Mode** (Default): Start with simulated funds for testing
-2. **Private Key**: Import wallet using private key (never commit to git!)
-3. **MetaMask**: Connect browser wallet for live trading
-
-## Usage
-
-1. **Connect Wallet**: Click "Connect Wallet" and choose your connection method
-2. **Configure Strategy**: Adjust risk, strategy, speed, signals, and bias settings
-3. **Toggle Trading Mode**: Switch between paper trading and live trading
-4. **Start Trading**: Click "Start Trading" to begin automated trading
-5. **Monitor Activity**: View real-time logs, signals, and performance statistics
-
-## Trading Strategies
-
-### Trend Following
-- Uses moving averages (SMA5, SMA10, SMA20)
-- Identifies strong trends and momentum
-- Best for trending markets
-
-### Mean Reversion
-- Calculates Z-scores to identify oversold/overbought conditions
-- Trades against extreme price movements
-- Best for ranging markets with clear boundaries
-
-### Range Trading
-- Identifies support and resistance levels
-- Trades bounces within established ranges
-- Watches for breakouts
-
-## Safety Features
-
-- **Paper Trading Mode**: Test strategies without risking real funds
-- **Position Sizing**: Automatic position sizing based on risk level
-- **Stop Loss**: Configurable stop loss for risk management
-- **Slippage Protection**: Monitors price impact before executing trades
-- **Activity Logging**: Complete audit trail of all trading decisions
-
-## Development
+### Production Build
 
 ```bash
-# Run development server
-npm run dev
-
 # Build for production
 npm run build
 
 # Preview production build
 npm run preview
-
-# Type checking
-npm run check
 ```
 
-## Architecture
+## 🎮 How to Use
 
-- **Frontend**: SvelteKit with TypeScript
-- **Styling**: Tailwind CSS with crypto-trader theme
-- **Blockchain**: ethers.js for Web3 interactions
-- **State Management**: Svelte stores
-- **Trading Engine**: Custom heuristic-based strategies
+### 1. Connect Your Wallet
+Click "Connect Wallet" and choose MetaMask or enter a private key (for testing only).
 
-## Security Considerations
+### 2. Configure Your Strategy
+- **Risk Level**: Choose safe, balanced, or aggressive
+- **Strategy**: Select trend following, mean reversion, or range trading
+- **Speed**: Set trading frequency (1min, 5min, or 1hr candles)
+- **Signals**: Configure indicator sensitivity
+- **Market Bias**: Set bullish, neutral, or bearish outlook
 
-- **Never commit private keys**: Always use environment variables for sensitive data
-- **Test with paper trading**: Always test strategies with simulated funds first
-- **Monitor actively**: Keep an eye on the agent's activity, especially in live mode
-- **Use appropriate risk settings**: Start with conservative settings until comfortable
-- **Network considerations**: Ensure stable internet connection for live trading
+### 3. Select a Trading Pair
+Browse available liquidity pools and select your preferred trading pair. Popular pairs include:
+- GALA/USDC
+- ETH/USDT
+- BNB/USDC
 
-## Contributing
+### 4. Start Trading
+Click "Start Trading" to begin automated trading. The agent will:
+- Monitor selected pools for opportunities
+- Execute trades based on your configuration
+- Track performance in real-time
+- Display logs of all activities
+
+## 📊 Trading Parameters
+
+| Risk Level | Position Size | Stop Loss | Take Profit | Trailing Stop |
+|------------|--------------|-----------|-------------|---------------|
+| Safe       | 15%          | 3%        | 2%          | Disabled      |
+| Balanced   | 30%          | 5%        | 4%          | Optional      |
+| Aggressive | 60%          | 15%       | 10%         | Enabled       |
+
+## 🛠️ Technology Stack
+
+- **Frontend**: SvelteKit 2.0 + TypeScript
+- **Styling**: Tailwind CSS + Custom Glassmorphism
+- **Blockchain**: ethers.js v6 + GalaChain SDK
+- **Price Data**: CoinGecko API
+- **State Management**: Svelte Stores
+- **Notifications**: Custom Toast System
+
+## 📁 Project Structure
+
+```
+gswap-trader/
+├── src/
+│   ├── lib/
+│   │   ├── components/    # UI components
+│   │   ├── gswap/         # GSwap integration
+│   │   ├── services/      # External services
+│   │   ├── stores/        # State management
+│   │   ├── trading/       # Trading logic
+│   │   └── wallet/        # Wallet management
+│   ├── routes/            # SvelteKit pages
+│   └── app.css           # Global styles
+├── static/               # Static assets
+└── package.json         # Dependencies
+```
+
+## 🔒 Security
+
+- Never share your private keys
+- Always verify contract addresses
+- Start with paper trading to test strategies
+- Use appropriate position sizing for your risk tolerance
+- Monitor your trades regularly
+
+## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
@@ -142,7 +175,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## License
+## 📜 License
 
 Copyright 2025 Jonas Michel
 
@@ -158,13 +191,25 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 
-## Disclaimer
+## ⚠️ Disclaimer
 
-This software is for educational purposes only. Cryptocurrency trading carries significant risk. Always do your own research and never invest more than you can afford to lose. The authors are not responsible for any financial losses incurred through the use of this software.
+This software is for educational purposes only. Cryptocurrency trading carries significant risk. Never trade with funds you cannot afford to lose. The developers are not responsible for any financial losses incurred through the use of this software.
 
-## Acknowledgments
+## 🙏 Acknowledgments
 
-- Built with [SvelteKit](https://kit.svelte.dev/)
-- Styled with [Tailwind CSS](https://tailwindcss.com/)
+- [GalaChain](https://gala.com/) for the blockchain infrastructure
+- [CoinGecko](https://www.coingecko.com/) for price data
+- [Freqtrade](https://www.freqtrade.io/) for trading strategy inspiration
+- [SvelteKit](https://kit.svelte.dev/) for the amazing framework
+- Built with [Tailwind CSS](https://tailwindcss.com/)
 - Web3 integration via [ethers.js](https://docs.ethers.io/)
-- Inspired by the crypto-trader project architecture
+
+---
+
+<div align="center">
+
+**Built with ❤️ by traders, for traders**
+
+[🌟 Star us on GitHub](https://github.com/jonasrmichel/gswap-trader)
+
+</div>
