@@ -103,7 +103,7 @@ class WalletService {
     }
 
     try {
-      // Request account access or get existing accounts
+      // Always request fresh accounts when not silent to ensure we get the current account
       const accounts = silent
         ? await this.ethereum.request({ method: 'eth_accounts' })
         : await this.ethereum.request({ method: 'eth_requestAccounts' });
@@ -112,11 +112,23 @@ class WalletService {
         throw new Error('No accounts found');
       }
 
-      // Create provider and signer
+      // Create provider and signer with the current account
       const provider = new ethers.BrowserProvider(this.ethereum);
       const signer = await provider.getSigner();
       const address = await signer.getAddress();
       const network = await provider.getNetwork();
+
+      // Check if this is actually a different account than what we have
+      const currentState = await new Promise<WalletState>(resolve => {
+        walletStore.subscribe(value => resolve(value))();
+      });
+
+      // If it's the same account and we're already connected, don't update unless forced
+      if (currentState.connected &&
+          currentState.address?.toLowerCase() === address.toLowerCase() &&
+          silent) {
+        return;
+      }
 
       // Update wallet store
       walletStore.update(state => ({
@@ -247,14 +259,29 @@ class WalletService {
   private setupEventListeners(): void {
     if (!this.ethereum) return;
 
+    // Remove any existing listeners first
+    this.ethereum.removeAllListeners('accountsChanged');
+    this.ethereum.removeAllListeners('chainChanged');
+
     // Handle account changes
     this.ethereum.on('accountsChanged', async (accounts: string[]) => {
       if (accounts.length === 0) {
         // User disconnected wallet
         await this.disconnect();
       } else {
-        // User switched accounts - reconnect
-        await this.connectMetaMask(true);
+        // User switched accounts - force reconnect with new account
+        const newAddress = accounts[0];
+        const currentState = await new Promise<WalletState>(resolve => {
+          walletStore.subscribe(value => resolve(value))();
+        });
+
+        // Only update if it's actually a different account
+        if (currentState.address?.toLowerCase() !== newAddress.toLowerCase()) {
+          // Reset store first to ensure clean state
+          walletStore.reset();
+          // Then connect with the new account
+          await this.connectMetaMask(true);
+        }
       }
     });
 
@@ -289,9 +316,12 @@ export const walletService = new WalletService();
 export async function connectWallet(type: 'metamask' | 'private-key', privateKey?: string): Promise<void> {
   switch (type) {
     case 'metamask':
+      // Always disconnect first to ensure clean state when connecting
+      await walletService.disconnect();
       return walletService.connectMetaMask();
     case 'private-key':
       if (!privateKey) throw new Error('Private key required');
+      await walletService.disconnect();
       return walletService.connectWithPrivateKey(privateKey);
     default:
       throw new Error('Unknown wallet type');
