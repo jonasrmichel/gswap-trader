@@ -36,6 +36,7 @@ export const selectedPool = writable<LiquidityPool | null>(null);
 
 export const initialBalance = writable(500);
 
+// Paper trading stats are reactive to initial balance
 export const paperTradingStats = writable({
   initialBalance: 500,
   currentValue: 500,

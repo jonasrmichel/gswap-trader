@@ -10,23 +10,33 @@ export interface PaperWallet {
 export class PaperTradingManager {
   private wallet: PaperWallet;
   private prices: Map<string, number> = new Map();
+  public balance: number; // Public property for balance updates
 
-  constructor(initialBalance = 10000) {
+  constructor(initialBalance = 500) {
+    this.balance = initialBalance;
+
+    // Use current market prices
+    const galaPrice = 0.01751;
+    const bnbPrice = 600;
+    const usdcPrice = 1;
+
     this.wallet = {
       balances: new Map([
         ['USDC', initialBalance * 0.5],
-        ['BNB', initialBalance * 0.25 / 300], // Assuming BNB = $300
-        ['GALA', initialBalance * 0.25 / 0.05], // Assuming GALA = $0.05
+        ['BNB', initialBalance * 0.25 / bnbPrice],
+        ['GALA', initialBalance * 0.25 / galaPrice],
       ]),
       initialBalance,
       currentValue: initialBalance,
       trades: [],
     };
 
-    // Set initial prices
-    this.prices.set('USDC', 1);
-    this.prices.set('BNB', 300);
-    this.prices.set('GALA', 0.05);
+    // Set initial prices with current values
+    this.prices.set('USDC', usdcPrice);
+    this.prices.set('USDT', 1);
+    this.prices.set('BNB', bnbPrice);
+    this.prices.set('GALA', galaPrice);
+    this.prices.set('ETH', 3500);
   }
 
   getBalance(token: string): number {
@@ -133,12 +143,21 @@ export class PaperTradingManager {
   }
 
   reset() {
+    const galaPrice = this.prices.get('GALA') || 0.01751;
+    const bnbPrice = this.prices.get('BNB') || 600;
+
     this.wallet.balances.clear();
     this.wallet.balances.set('USDC', this.wallet.initialBalance * 0.5);
-    this.wallet.balances.set('BNB', this.wallet.initialBalance * 0.25 / 300);
-    this.wallet.balances.set('GALA', this.wallet.initialBalance * 0.25 / 0.05);
+    this.wallet.balances.set('BNB', this.wallet.initialBalance * 0.25 / bnbPrice);
+    this.wallet.balances.set('GALA', this.wallet.initialBalance * 0.25 / galaPrice);
     this.wallet.currentValue = this.wallet.initialBalance;
     this.wallet.trades = [];
+  }
+
+  updateInitialBalance(newBalance: number) {
+    this.wallet.initialBalance = newBalance;
+    this.balance = newBalance;
+    this.reset();
   }
 
   getTrades(): Trade[] {

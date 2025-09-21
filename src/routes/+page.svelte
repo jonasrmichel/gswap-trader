@@ -43,12 +43,20 @@
       tradingStats.set(logger.getStats());
     });
 
+    // Update paper trading stats periodically
+    const statsInterval = setInterval(() => {
+      if (paperManager) {
+        paperTradingStats.set(paperManager.getStats());
+      }
+    }, 1000); // Update every second
+
     // Simulate some initial logs
     logger.logSystem('GSwap Agent initialized', 'success');
     logger.logSystem('Connected to BSC network');
 
     return () => {
       unsubscribe();
+      clearInterval(statsInterval);
       if (agent?.isActive()) {
         agent.stop();
       }
@@ -56,7 +64,7 @@
   });
 
   $: if ($isWalletConnected && !agent && client && wallet && logger) {
-    agent = new TradingAgent(client, wallet, $tradingConfig, logger);
+    agent = new TradingAgent(client, wallet, $tradingConfig, logger, paperManager);
     if ($selectedPool) {
       agent.setSelectedPool($selectedPool);
     }
@@ -73,8 +81,9 @@
   }
 
   // Update paper trading initial balance
-  $: if (paperManager && $initialBalance) {
-    paperManager.balance = $initialBalance;
+  $: if (paperManager && $initialBalance && paperManager.balance !== $initialBalance) {
+    paperManager.updateInitialBalance($initialBalance);
+    paperTradingStats.set(paperManager.getStats());
   }
 </script>
 

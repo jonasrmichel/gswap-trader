@@ -4,8 +4,10 @@ import type { TradingConfig } from './config';
 import type { LiquidityPool, Trade } from '../gswap/types';
 import { TradingStrategy } from './strategies';
 import { TradingLogger } from './logger';
+import { PaperTradingManager } from './paper-trading';
 import { getTradingParams, SIGNAL_THRESHOLDS } from './config';
 import { toast } from '../stores/toast';
+import { paperTradingStats } from '../stores/trading';
 
 export class TradingAgent {
   private client: GSwapClient;
@@ -13,6 +15,7 @@ export class TradingAgent {
   private strategy: TradingStrategy;
   private logger: TradingLogger;
   private config: TradingConfig;
+  private paperManager: PaperTradingManager | null = null;
   private isRunning = false;
   private intervalId?: NodeJS.Timeout;
   private currentTrades: Map<string, Trade> = new Map();
@@ -22,13 +25,19 @@ export class TradingAgent {
     client: GSwapClient,
     wallet: WalletManager,
     config: TradingConfig,
-    logger: TradingLogger
+    logger: TradingLogger,
+    paperManager?: PaperTradingManager
   ) {
     this.client = client;
     this.wallet = wallet;
     this.config = config;
     this.strategy = new TradingStrategy(config);
     this.logger = logger;
+    this.paperManager = paperManager || null;
+  }
+
+  setPaperManager(manager: PaperTradingManager) {
+    this.paperManager = manager;
   }
 
   updateConfig(config: TradingConfig) {
@@ -242,23 +251,52 @@ export class TradingAgent {
       this.currentTrades.set(trade.id, trade);
       this.logger.logTrade(trade);
 
-      // Execute swap
-      const txHash = await this.client.executeSwap({
-        poolId: pool.id,
-        tokenIn,
-        tokenOut,
-        amountIn,
-        minAmountOut: (parseFloat(amountOut) * (1 - params.slippage)).toString(),
-        slippage: params.slippage,
-      });
+      // Execute swap (paper or live)
+      if (this.config.paperTrading && this.paperManager) {
+        // Paper trading execution
+        try {
+          // Update prices in paper manager
+          if (pool.priceTokenA) this.paperManager.updatePrice(pool.tokenA.symbol, pool.priceTokenA);
+          if (pool.priceTokenB) this.paperManager.updatePrice(pool.tokenB.symbol, pool.priceTokenB);
 
-      // Update trade status
-      trade.txHash = txHash;
-      trade.status = 'success';
-      trade.profit = this.calculateProfit(trade, pool);
+          const paperTrade = this.paperManager.executeTrade(
+            tokenIn,
+            tokenOut,
+            parseFloat(amountIn),
+            parseFloat(amountOut)
+          );
+
+          trade.txHash = paperTrade.id;
+          trade.status = 'success';
+          trade.profit = paperTrade.profit || 0;
+
+          // Update stats store
+          paperTradingStats.set(this.paperManager.getStats());
+
+          this.logger.logSystem(`Paper trade executed: ${tokenIn} -> ${tokenOut}`, 'success');
+        } catch (error: any) {
+          trade.status = 'failed';
+          this.logger.logError('Paper trade failed', error);
+        }
+      } else {
+        // Live trading execution
+        const txHash = await this.client.executeSwap({
+          poolId: pool.id,
+          tokenIn,
+          tokenOut,
+          amountIn,
+          minAmountOut: (parseFloat(amountOut) * (1 - params.slippage)).toString(),
+          slippage: params.slippage,
+        });
+
+        trade.txHash = txHash;
+        trade.status = 'success';
+        trade.profit = this.calculateProfit(trade, pool);
+
+        this.logger.logSystem(`Live trade executed: ${txHash}`, 'success');
+      }
 
       this.logger.logTrade(trade);
-      this.logger.logSystem(`Trade executed: ${txHash}`, 'success');
 
     } catch (error) {
       this.logger.logError('Trade execution failed', error);
