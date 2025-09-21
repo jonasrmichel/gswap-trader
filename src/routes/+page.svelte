@@ -1,0 +1,121 @@
+<script lang="ts">
+  import { onMount, onDestroy } from 'svelte';
+  import WalletConnect from '$lib/components/WalletConnect.svelte';
+  import TradingConfig from '$lib/components/TradingConfig.svelte';
+  import TradingLog from '$lib/components/TradingLog.svelte';
+  import TradingStats from '$lib/components/TradingStats.svelte';
+  import TradingControls from '$lib/components/TradingControls.svelte';
+  import PoolList from '$lib/components/PoolList.svelte';
+  import {
+    tradingActive,
+    tradingLogs,
+    tradingStats,
+    liquidityPools,
+    isWalletConnected,
+    tradingConfig,
+    paperTradingStats
+  } from '$lib/stores/trading';
+  import { GSwapClient } from '$lib/gswap/client';
+  import { WalletManager } from '$lib/wallet/manager';
+  import { TradingAgent } from '$lib/trading/agent';
+  import { TradingLogger } from '$lib/trading/logger';
+  import { PaperTradingManager } from '$lib/trading/paper-trading';
+
+  let client: GSwapClient;
+  let wallet: WalletManager;
+  let agent: TradingAgent | null = null;
+  let logger: TradingLogger;
+  let paperManager: PaperTradingManager;
+
+  onMount(async () => {
+    // Initialize services
+    client = new GSwapClient();
+    wallet = new WalletManager(client);
+    logger = new TradingLogger();
+    paperManager = new PaperTradingManager(10000);
+
+    // Subscribe to logger updates
+    const unsubscribe = logger.subscribe((log) => {
+      tradingLogs.update(logs => [log, ...logs].slice(0, 100));
+      tradingStats.set(logger.getStats());
+    });
+
+    // Load pools
+    const pools = await client.getPools();
+    liquidityPools.set(pools);
+
+    // Simulate some initial logs
+    logger.logSystem('GSwap Agent initialized', 'success');
+    logger.logSystem('Connected to BSC network');
+
+    return () => {
+      unsubscribe();
+      if (agent?.isActive()) {
+        agent.stop();
+      }
+    };
+  });
+
+  $: if ($isWalletConnected && !agent) {
+    agent = new TradingAgent(client, wallet, $tradingConfig, logger);
+  }
+</script>
+
+<div class="min-h-screen bg-background text-foreground font-primary">
+  <!-- Header -->
+  <header class="border-b border-border-subtle bg-surface-default backdrop-blur-xl">
+    <div class="container mx-auto px-4 py-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-4">
+          <h1 class="text-2xl font-bold bg-gradient-to-r from-accent to-purple-400 bg-clip-text text-transparent">
+            GSwap Agent
+          </h1>
+          <div class="flex items-center gap-2">
+            <div class="w-2 h-2 rounded-full {$tradingActive ? 'bg-success animate-pulse' : 'bg-muted'}"></div>
+            <span class="text-sm text-muted">
+              {$tradingActive ? 'Trading Active' : 'Idle'}
+            </span>
+          </div>
+        </div>
+        <WalletConnect />
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="container mx-auto px-4 py-6 space-y-6">
+    <!-- Trading Mode Indicator -->
+    {#if $tradingConfig.paperTrading}
+      <div class="bg-warning/10 border border-warning/30 rounded-lg p-3 text-center">
+        <span class="text-warning font-medium">⚠️ Paper Trading Mode</span>
+        <span class="text-sm text-muted ml-2">Trading with simulated funds</span>
+      </div>
+    {:else if $isWalletConnected}
+      <div class="bg-destructive/10 border border-destructive/30 rounded-lg p-3 text-center">
+        <span class="text-destructive font-medium">🔴 Live Trading Mode</span>
+        <span class="text-sm text-muted ml-2">Trading with real funds</span>
+      </div>
+    {/if}
+
+    <!-- Trading Controls -->
+    <TradingControls {agent} {logger} />
+
+    <!-- Trading Configuration -->
+    <TradingConfig />
+
+    <!-- Stats and Pools -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <TradingStats />
+      <PoolList />
+    </div>
+
+    <!-- Trading Log -->
+    <TradingLog />
+  </main>
+</div>
+
+<style>
+  :global(body) {
+    font-family: 'Space Grotesk', 'Noto Sans', sans-serif;
+  }
+</style>
