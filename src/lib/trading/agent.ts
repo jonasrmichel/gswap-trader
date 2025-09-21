@@ -174,15 +174,6 @@ export class TradingAgent {
       // Check if signal meets threshold
       const threshold = SIGNAL_THRESHOLDS[this.config.signals];
       if (signal.confidence >= threshold && signal.action !== 'hold') {
-        // Check balance before executing in live mode
-        if (!this.config.paperTrading) {
-          const params = getTradingParams(this.config);
-          const requiredBalance = totalValue * params.maxPositionSize;
-          if (requiredBalance > totalValue) {
-            this.logger.logSystem('Insufficient balance for trade', 'warning');
-            return;
-          }
-        }
         await this.executeSignal(signal, this.selectedPool, totalValue);
       }
     } catch (error) {
@@ -280,6 +271,21 @@ export class TradingAgent {
         }
       } else {
         // Live trading execution
+        // Check if wallet has sufficient balance for the trade
+        const balances = await this.walletManager.getBalances();
+        const tokenInBalance = balances.find(b => b.token === tokenIn);
+
+        if (!tokenInBalance || parseFloat(tokenInBalance.balance) < parseFloat(amountIn)) {
+          const availableBalance = tokenInBalance?.balance || '0';
+          this.logger.logSystem(
+            `Insufficient ${tokenIn} balance. Required: ${amountIn}, Available: ${availableBalance}`,
+            'warning'
+          );
+          trade.status = 'failed';
+          this.logger.logTrade(trade);
+          return;
+        }
+
         const txHash = await this.client.executeSwap({
           poolId: pool.id,
           tokenIn,

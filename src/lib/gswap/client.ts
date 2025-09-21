@@ -19,6 +19,12 @@ export class GSwapClient {
   }
 
   async getBalance(tokenAddress: string, walletAddress: string): Promise<string> {
+    // Validate wallet address
+    if (!walletAddress || !ethers.isAddress(walletAddress)) {
+      console.error('Invalid wallet address provided to getBalance:', walletAddress);
+      return '0';
+    }
+
     if (tokenAddress === ethers.ZeroAddress) {
       // Native token balance
       const balance = await this.provider.getBalance(walletAddress);

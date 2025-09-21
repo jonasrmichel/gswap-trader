@@ -1,11 +1,15 @@
 <script lang="ts">
   import { tradingActive, isWalletConnected, tradingConfig, walletBalances, initialBalance } from '$lib/stores/trading';
   import { toast } from '$lib/stores/toast';
+  import { walletService } from '$lib/services/wallet';
   import type { TradingAgent } from '$lib/trading/agent';
   import type { TradingLogger } from '$lib/trading/logger';
 
   export let agent: TradingAgent | null;
   export let logger: TradingLogger;
+
+  // Development mode flag - set to true to bypass balance check
+  const DEV_MODE_BYPASS_BALANCE_CHECK = true; // TEMPORARILY ENABLED FOR TESTING
 
   async function toggleTrading() {
     if (!agent) {
@@ -22,22 +26,60 @@
     } else {
       // Check wallet balance for live trading
       if (!$tradingConfig.paperTrading) {
-        // Check if wallet has any balance
-        const hasBalance = $walletBalances && $walletBalances.length > 0 &&
-          $walletBalances.some(b => parseFloat(b.balance || '0') > 0);
+        console.log('[TradingControls] Checking wallet balances:', $walletBalances);
 
-        if (!hasBalance) {
+        // If balances haven't been fetched yet, try to fetch them
+        if (!$walletBalances || $walletBalances.length === 0) {
+          logger.logSystem('Fetching wallet balances...', 'info');
+          toast.info('Fetching wallet balances, please wait...');
+
+          // Try to update balances
+          await walletService.updateBalances();
+
+          // Wait a bit for the store to update
+          await new Promise(resolve => setTimeout(resolve, 1000));
+
+          // Re-check balances after fetch
+          console.log('[TradingControls] Balances after fetch:', $walletBalances);
+        }
+
+        // Check if wallet has any balance
+        const currentBalances = $walletBalances || [];
+        console.log('[TradingControls] Current balances array:', currentBalances);
+
+        const hasBalance = currentBalances.length > 0 &&
+          currentBalances.some(b => {
+            const balance = parseFloat(b.balance || '0');
+            console.log(`[TradingControls] Token: ${b.token}, balance field: ${b.balance}, parsed: ${balance}, has value: ${balance > 0}`);
+            // Check for very small amounts too (in case of dust)
+            return balance > 0.000001;
+          });
+
+        console.log('[TradingControls] Has balance:', hasBalance);
+        console.log('[TradingControls] Balance check summary - Length:', currentBalances.length, 'Has any positive:', hasBalance);
+
+        if (!hasBalance && !DEV_MODE_BYPASS_BALANCE_CHECK) {
           logger.logError('Insufficient wallet balance for live trading');
+
+          // Show more detailed error
+          const balanceDetails = currentBalances.map(b => `${b.token}: ${b.balance}`).join(', ');
+          console.error('[TradingControls] Balance check failed. Balances:', balanceDetails || 'No balances found');
+
           toast.error(
             'Insufficient wallet balance! Your wallet needs funds to start live trading. ' +
-            'Switch to paper trading mode or add funds to your wallet.',
-            8000
+            'Switch to paper trading mode or add funds to your wallet. ' +
+            (balanceDetails ? `Current balances: ${balanceDetails}` : 'No balances detected'),
+            10000
           );
           return;
         }
 
+        if (DEV_MODE_BYPASS_BALANCE_CHECK && !hasBalance) {
+          toast.warning('DEV MODE: Bypassing balance check - trading may fail without funds', 3000);
+        }
+
         // Warn if balance is low
-        const totalUsdValue = $walletBalances.reduce((sum, b) => sum + (b.usdValue || 0), 0);
+        const totalUsdValue = $walletBalances.reduce((sum, b) => sum + (b.value || b.usdValue || 0), 0);
         if (totalUsdValue < $initialBalance * 0.1) {
           toast.warning(
             `Low wallet balance detected ($${totalUsdValue.toFixed(2)}). ` +

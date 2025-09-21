@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import WalletConnect from '$lib/components/WalletConnect.svelte';
+  import WalletBalancePanel from '$lib/components/WalletBalancePanel.svelte';
   import TradingConfig from '$lib/components/TradingConfig.svelte';
   import TradingLog from '$lib/components/TradingLog.svelte';
   import TradingStats from '$lib/components/TradingStats.svelte';
@@ -23,6 +24,7 @@
   import { TradingAgent } from '$lib/trading/agent';
   import { TradingLogger } from '$lib/trading/logger';
   import { PaperTradingManager } from '$lib/trading/paper-trading';
+  import { initializeWallet } from '$lib/services/wallet';
 
   let client: GSwapClient | null = null;
   let wallet: WalletManager | null = null;
@@ -31,6 +33,9 @@
   let paperManager: PaperTradingManager | null = null;
 
   onMount(async () => {
+    // Initialize wallet service (will auto-connect if env key is set)
+    await initializeWallet();
+
     // Initialize services
     client = new GSwapClient();
     wallet = new WalletManager(client);
@@ -51,8 +56,39 @@
     }, 1000); // Update every second
 
     // Simulate some initial logs
-    logger.logSystem('GSwap Agent initialized', 'success');
+    logger.logSystem('GSwap Trader initialized', 'success');
     logger.logSystem('Connected to BSC network');
+
+    // Apply default settings from env
+    if (import.meta.env.VITE_DEFAULT_PAPER_TRADING !== undefined) {
+      const paperMode = import.meta.env.VITE_DEFAULT_PAPER_TRADING === 'true';
+      tradingConfig.update(config => ({ ...config, paperTrading: paperMode }));
+      logger.logSystem(`Default trading mode set to: ${paperMode ? 'Paper' : 'Live'}`, 'info');
+    }
+
+    // Check for auto-start trading
+    if (import.meta.env.VITE_AUTO_START_TRADING === 'true' && import.meta.env.VITE_WALLET_PRIVATE_KEY) {
+      logger.logSystem('Auto-start trading enabled, waiting for wallet connection...', 'info');
+
+      // Wait for wallet to connect and agent to be ready
+      const checkInterval = setInterval(async () => {
+        if ($isWalletConnected && agent && !$tradingActive) {
+          clearInterval(checkInterval);
+          logger.logSystem('Auto-starting trading from environment configuration', 'info');
+
+          try {
+            await agent.start();
+            tradingActive.set(true);
+            logger.logSystem('Trading started automatically', 'success');
+          } catch (error) {
+            logger.logError('Failed to auto-start trading', error);
+          }
+        }
+      }, 1000); // Check every second
+
+      // Clean up interval after 30 seconds if not connected
+      setTimeout(() => clearInterval(checkInterval), 30000);
+    }
 
     return () => {
       unsubscribe();
@@ -81,11 +117,14 @@
   }
 
   // Update paper trading initial balance
-  $: if (paperManager && $initialBalance && paperManager.balance !== $initialBalance) {
+  $: if (paperManager && $initialBalance) {
     paperManager.updateInitialBalance($initialBalance);
-    paperTradingStats.set(paperManager.getStats());
   }
 </script>
+
+<svelte:head>
+  <title>GSwap Trader</title>
+</svelte:head>
 
 <div class="min-h-screen bg-background text-foreground font-primary">
   <!-- Header -->
@@ -94,7 +133,7 @@
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-4">
           <h1 class="text-2xl font-bold bg-gradient-to-r from-accent to-purple-400 bg-clip-text text-transparent">
-            GSwap Agent
+            GSwap Trader
           </h1>
           <div class="flex items-center gap-2">
             <div class="w-2 h-2 rounded-full {$tradingActive ? 'bg-success animate-pulse' : 'bg-muted'}"></div>
@@ -126,10 +165,11 @@
     <!-- Trading Controls -->
     <TradingControls {agent} {logger} />
 
-    <!-- Initial Balance and Trading Configuration -->
+    <!-- Initial Balance, Wallet Balance, and Trading Configuration -->
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-      <div class="lg:col-span-1">
+      <div class="lg:col-span-1 space-y-6">
         <InitialBalance />
+        <WalletBalancePanel />
       </div>
       <div class="lg:col-span-3">
         <TradingConfig />

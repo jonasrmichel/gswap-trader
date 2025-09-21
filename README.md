@@ -6,6 +6,8 @@
 
 **Your Automated Trading Companion for GSwap DEX**
 
+<img src="docs/screenshots/app-dashboard.png" alt="GSwap Trader Dashboard" width="800" style="margin-top: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![SvelteKit](https://img.shields.io/badge/SvelteKit-5.0-FF3E00.svg)](https://kit.svelte.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6.svg)](https://www.typescriptlang.org/)

@@ -21,12 +21,24 @@ export class WalletManager {
   private client: GSwapClient;
   private config: WalletConfig | null = null;
   private walletState: WalletState | null = null;
+  private connected: boolean = false;
 
   constructor(client: GSwapClient) {
     this.client = client;
     // Subscribe to wallet store changes
     walletStore.subscribe(state => {
       this.walletState = state;
+      // Sync connected state
+      if (state.connected && state.address) {
+        this.connected = true;
+        this.config = {
+          type: 'metamask',
+          address: state.address
+        };
+      } else {
+        this.connected = false;
+        this.config = null;
+      }
     });
   }
 
@@ -98,9 +110,9 @@ export class WalletManager {
     if (this.walletState?.balances && this.walletState.balances.length > 0 && this.config?.type !== 'demo') {
       // Convert wallet store balances to our format
       return this.walletState.balances.map(b => ({
-        token: b.symbol,
+        token: b.token,
         balance: b.balance,
-        value: b.usdValue || 0
+        value: b.value || 0
       }));
     }
 
@@ -114,6 +126,12 @@ export class WalletManager {
     }
 
     // Get real balances from blockchain
+    const walletAddress = this.getAddress();
+    if (!walletAddress) {
+      console.error('No wallet address available for balance check');
+      return [];
+    }
+
     const tokens = [
       { symbol: 'BNB', address: ethers.ZeroAddress, price: 600 },
       { symbol: 'GALA', address: '0xd1d2eb1b1e90b638588728b4130137d262c87cae', price: 0.01751 },
@@ -126,7 +144,7 @@ export class WalletManager {
 
     for (const token of tokens) {
       try {
-        const balance = await this.client.getBalance(token.address, this.getAddress()!);
+        const balance = await this.client.getBalance(token.address, walletAddress);
         const value = parseFloat(balance) * token.price;
         balances.push({
           token: token.symbol,

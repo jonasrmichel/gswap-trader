@@ -1,17 +1,18 @@
 <script lang="ts">
-  import { walletStore, connectWallet, disconnectWallet } from '$lib/services/wallet';
+  import { walletStore, walletService, connectWallet, disconnectWallet } from '$lib/services/wallet';
   import { isWalletConnected, walletAddress, walletBalances, tradingActive } from '$lib/stores/trading';
   import { toast } from '$lib/stores/toast';
   import WalletModal from './WalletModal.svelte';
 
   let showModal = false;
   let selectedType: 'metamask' | 'private-key' = 'metamask';
-  let privateKey = '';
-  let error = '';
+  let privateKey: string = '';
+  let error: string = '';
   let isConnecting = false;
 
   // Sync wallet store with trading store
   $: if ($walletStore.connected) {
+    console.log('[WalletConnect] Syncing wallet store, balances:', $walletStore.balances);
     isWalletConnected.set(true);
     walletAddress.set($walletStore.address);
     walletBalances.set($walletStore.balances);
@@ -22,6 +23,7 @@
   }
 
   async function handleConnect() {
+    console.log('[WalletConnect] handleConnect called, selectedType:', selectedType, 'privateKey:', privateKey);
     error = '';
     isConnecting = true;
 
@@ -32,17 +34,20 @@
         return;
       }
 
-      // Disconnect first if already connected to ensure fresh connection
-      if ($walletStore.connected) {
-        await disconnectWallet();
-        // Small delay to ensure clean state
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
+      // Store the current privateKey value to avoid any binding issues
+      const currentPrivateKey = selectedType === 'private-key' ? privateKey : undefined;
+      console.log('[WalletConnect] About to connect with privateKey:', currentPrivateKey);
 
-      await connectWallet(selectedType, privateKey || undefined);
+      // The wallet service now handles disconnecting internally for MetaMask
+      await connectWallet(selectedType, currentPrivateKey);
+
+      // Small delay to ensure state is updated
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       showModal = false;
       privateKey = '';
     } catch (err: any) {
+      console.error('[WalletConnect] Connection error:', err);
       error = err.message || 'Failed to connect wallet';
     } finally {
       isConnecting = false;
@@ -50,6 +55,9 @@
   }
 
   async function handleSwitchWallet() {
+    // Clear any errors
+    error = '';
+    // Show modal for wallet selection
     showModal = true;
     selectedType = 'metamask';
   }
@@ -63,9 +71,11 @@
   }
 
   function handleClose() {
+    console.log('[WalletConnect] Closing modal, resetting state');
     showModal = false;
     error = '';
     privateKey = '';
+    selectedType = 'metamask';
   }
 </script>
 
@@ -82,6 +92,13 @@
       <span class="text-xs text-muted">Connected:</span>
       <span class="ml-2 text-sm font-mono text-accent">{$walletStore.address?.slice(0, 6)}...{$walletStore.address?.slice(-4)}</span>
     </div>
+    <button
+      on:click={() => walletService.updateBalances()}
+      class="px-3 py-1 bg-primary/20 text-primary border border-primary/40 rounded-lg hover:bg-primary/30 transition-colors"
+      title="Refresh wallet balances"
+    >
+      Refresh
+    </button>
     <button
       on:click={handleSwitchWallet}
       disabled={$tradingActive}

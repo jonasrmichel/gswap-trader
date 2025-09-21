@@ -46,6 +46,11 @@
               bind:value={privateKey}
               placeholder="Enter your private key"
               class="w-full px-3 py-2 bg-card-darker rounded-lg border border-border-subtle text-foreground placeholder-muted focus:border-accent focus:outline-none focus:bg-surface-solid transition-colors"
+              on:input={(e) => {
+                // Ensure we only get the input value
+                privateKey = e.target.value;
+                console.log('[WalletModal] Private key input changed:', privateKey.length, 'chars');
+              }}
             />
           </div>
         {/if}

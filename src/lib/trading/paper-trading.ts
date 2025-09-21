@@ -155,9 +155,12 @@ export class PaperTradingManager {
   }
 
   updateInitialBalance(newBalance: number) {
-    this.wallet.initialBalance = newBalance;
-    this.balance = newBalance;
-    this.reset();
+    // Only reset if the balance actually changes
+    if (this.wallet.initialBalance !== newBalance) {
+      this.wallet.initialBalance = newBalance;
+      this.balance = newBalance;
+      this.reset();
+    }
   }
 
   getTrades(): Trade[] {
