@@ -1,25 +1,8 @@
-# 🤖💎 GSwap Trader
+# <img src="static/logo.png" alt="GSwap Trader Logo" width="64" height="64" align="left"> GSwap Trader
 
 <div align="center">
 
-```ascii
-        🌟
-       ╱ ╲
-      ╱   ╲
-     ╱ 🤖  ╲
-    ╱   $   ╲
-   ╱  GSWAP  ╲
-  ╱___________╲
-  │ ┌─────┐  │
-  │ │ BUY │  │
-  │ └─────┘  │
-  │ ┌─────┐  │
-  │ │SELL │  │
-  │ └─────┘  │
-  │ 📊 📈 💰 │
-  └───────────┘
-    ⚡ 24/7 ⚡
-```
+<img src="static/logo.png" alt="GSwap Trader" width="256" height="256">
 
 **Your Automated Trading Companion for GSwap DEX**
 
