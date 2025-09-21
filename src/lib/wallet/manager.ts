@@ -1,5 +1,7 @@
 import { ethers } from 'ethers';
 import type { GSwapClient } from '../gswap/client';
+import { walletStore, type WalletState } from '../services/wallet';
+import { get } from 'svelte/store';
 
 export type WalletType = 'private-key' | 'phantom' | 'metamask' | 'demo';
 
@@ -18,10 +20,14 @@ export interface WalletBalance {
 export class WalletManager {
   private client: GSwapClient;
   private config: WalletConfig | null = null;
-  private connected = false;
+  private walletState: WalletState | null = null;
 
   constructor(client: GSwapClient) {
     this.client = client;
+    // Subscribe to wallet store changes
+    walletStore.subscribe(state => {
+      this.walletState = state;
+    });
   }
 
   async connect(config: WalletConfig): Promise<string> {
@@ -72,11 +78,11 @@ export class WalletManager {
   }
 
   isConnected(): boolean {
-    return this.connected;
+    return this.walletState?.connected || false;
   }
 
   getAddress(): string | undefined {
-    return this.config?.address;
+    return this.walletState?.address || this.config?.address;
   }
 
   getType(): WalletType | undefined {
@@ -84,11 +90,21 @@ export class WalletManager {
   }
 
   async getBalances(): Promise<WalletBalance[]> {
-    if (!this.connected || !this.config?.address) {
+    if (!this.isConnected()) {
       throw new Error('Wallet not connected');
     }
 
-    if (this.config.type === 'demo') {
+    // Use balances from wallet store if available and not demo
+    if (this.walletState?.balances && this.walletState.balances.length > 0 && this.config?.type !== 'demo') {
+      // Convert wallet store balances to our format
+      return this.walletState.balances.map(b => ({
+        token: b.symbol,
+        balance: b.balance,
+        value: b.usdValue || 0
+      }));
+    }
+
+    if (this.config?.type === 'demo') {
       // Return demo balances
       return [
         { token: 'BNB', balance: '1.5', value: 450 },
@@ -99,21 +115,23 @@ export class WalletManager {
 
     // Get real balances from blockchain
     const tokens = [
-      { symbol: 'BNB', address: ethers.ZeroAddress },
-      { symbol: 'GALA', address: '0xd1d2eb1b1e90b638588728b4130137d262c87cae' },
-      { symbol: 'USDC', address: '0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d' },
+      { symbol: 'BNB', address: ethers.ZeroAddress, price: 600 },
+      { symbol: 'GALA', address: '0xd1d2eb1b1e90b638588728b4130137d262c87cae', price: 0.01751 },
+      { symbol: 'USDC', address: '0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d', price: 1 },
+      { symbol: 'USDT', address: '0x55d398326f99059ff775485246999027b3197955', price: 1 },
+      { symbol: 'ETH', address: '0x2170ed0880ac9a755fd29b2688956bd959f933f8', price: 3500 },
     ];
 
     const balances: WalletBalance[] = [];
 
     for (const token of tokens) {
       try {
-        const balance = await this.client.getBalance(token.address, this.config.address);
+        const balance = await this.client.getBalance(token.address, this.getAddress()!);
+        const value = parseFloat(balance) * token.price;
         balances.push({
           token: token.symbol,
           balance,
-          value: parseFloat(balance) * (token.symbol === 'BNB' ? 300 :
-                                         token.symbol === 'GALA' ? 0.05 : 1),
+          value
         });
       } catch (error) {
         console.error(`Error getting ${token.symbol} balance:`, error);
@@ -125,7 +143,7 @@ export class WalletManager {
   }
 
   async signTransaction(tx: any): Promise<string> {
-    if (!this.connected) {
+    if (!this.isConnected()) {
       throw new Error('Wallet not connected');
     }
 

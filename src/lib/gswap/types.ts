@@ -8,6 +8,7 @@ export interface Token {
 
 export interface LiquidityPool {
   id: string;
+  name?: string;
   tokenA: Token;
   tokenB: Token;
   reserveA: string;
@@ -17,6 +18,9 @@ export interface LiquidityPool {
   apy?: number;
   volume24h?: number;
   tvl?: number;
+  priceTokenA?: number;
+  priceTokenB?: number;
+  lastUpdated?: Date;
 }
 
 export interface SwapParams {

@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { tradingActive, isWalletConnected, tradingConfig } from '$lib/stores/trading';
+  import { tradingActive, isWalletConnected, tradingConfig, walletBalances, initialBalance } from '$lib/stores/trading';
+  import { toast } from '$lib/stores/toast';
   import type { TradingAgent } from '$lib/trading/agent';
   import type { TradingLogger } from '$lib/trading/logger';
 
@@ -9,6 +10,7 @@
   async function toggleTrading() {
     if (!agent) {
       logger.logError('Trading agent not initialized');
+      toast.error('Trading agent not initialized. Please refresh the page.');
       return;
     }
 
@@ -16,16 +18,50 @@
       agent.stop();
       tradingActive.set(false);
       logger.logSystem('Trading stopped by user', 'warning');
+      toast.warning('Trading stopped');
     } else {
+      // Check wallet balance for live trading
+      if (!$tradingConfig.paperTrading) {
+        // Check if wallet has any balance
+        const hasBalance = $walletBalances && $walletBalances.length > 0 &&
+          $walletBalances.some(b => parseFloat(b.balance || '0') > 0);
+
+        if (!hasBalance) {
+          logger.logError('Insufficient wallet balance for live trading');
+          toast.error(
+            'Insufficient wallet balance! Your wallet needs funds to start live trading. ' +
+            'Switch to paper trading mode or add funds to your wallet.',
+            8000
+          );
+          return;
+        }
+
+        // Warn if balance is low
+        const totalUsdValue = $walletBalances.reduce((sum, b) => sum + (b.usdValue || 0), 0);
+        if (totalUsdValue < $initialBalance * 0.1) {
+          toast.warning(
+            `Low wallet balance detected ($${totalUsdValue.toFixed(2)}). ` +
+            'Consider adding more funds for effective trading.',
+            6000
+          );
+        }
+      }
+
       try {
         await agent.start();
         tradingActive.set(true);
-        logger.logSystem(
-          `Trading started in ${$tradingConfig.paperTrading ? 'PAPER' : 'LIVE'} mode`,
-          'success'
-        );
+
+        const message = `Trading started in ${$tradingConfig.paperTrading ? 'PAPER' : 'LIVE'} mode`;
+        logger.logSystem(message, 'success');
+
+        if ($tradingConfig.paperTrading) {
+          toast.info(`Paper trading started with $${$initialBalance} virtual balance`);
+        } else {
+          toast.success('Live trading started! Monitoring markets...');
+        }
       } catch (error: any) {
         logger.logError('Failed to start trading', error);
+        toast.error(`Failed to start trading: ${error.message || 'Unknown error'}`);
       }
     }
   }

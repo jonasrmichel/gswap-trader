@@ -10,6 +10,11 @@ export default {
           'default': 'rgba(255, 255, 255, 0.05)',
           'hover': 'rgba(255, 255, 255, 0.08)',
           'pressed': 'rgba(255, 255, 255, 0.12)',
+          'solid': '#1a1a1f', // Solid dark surface for modals
+        },
+        'card': {
+          'dark': '#18181b', // Solid dark card background
+          'darker': '#0f0f12', // Even darker variant
         },
         'border': {
           'subtle': 'rgba(255, 255, 255, 0.1)',

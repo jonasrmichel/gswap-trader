@@ -3,7 +3,81 @@
 @tailwind utilities;
 
 @layer base {
+  @font-face {
+    font-family: 'Space Grotesk';
+    src: url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+    font-display: swap;
+  }
+
+  html {
+    @apply bg-background text-foreground font-primary;
+  }
+
   body {
-    @apply bg-background text-foreground;
+    @apply min-h-screen m-0 bg-background;
+  }
+
+  /* Ensure body doesn't have competing z-index */
+  #app, main, header {
+    position: relative;
+    z-index: 1;
+  }
+
+  * {
+    scrollbar-color: auto;
+    scrollbar-width: 4px;
+    &::-webkit-scrollbar {
+      @apply w-1 h-1;
+    }
+    &::-webkit-scrollbar-thumb {
+      @apply rounded-full bg-surface-pressed;
+      @apply hover:bg-white;
+      @apply active:bg-white;
+    }
+    &::selection {
+      @apply bg-accent text-white;
+    }
+
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer components {
+  /* Ensure modals appear on top */
+  .modal-overlay {
+    position: fixed !important;
+    z-index: 999999 !important;
+    inset: 0 !important;
+  }
+
+  .modal-content {
+    position: relative !important;
+    z-index: 1000000 !important;
+  }
+
+  /* Form Elements */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  textarea {
+    background-color: rgba(255, 255, 255, 0.08);
+    @apply border border-border-subtle rounded-lg px-4 py-2 text-white placeholder-muted focus:border-accent focus:outline-none transition-colors;
+  }
+
+  select {
+    @apply border border-border-subtle rounded-lg px-4 py-2 text-white focus:border-accent focus:outline-none transition-colors appearance-none;
+    background-color: rgba(255, 255, 255, 0.08);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23fff' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 0.5rem center;
+    background-repeat: no-repeat;
+    background-size: 1.5em 1.5em;
+    padding-right: 2.5rem;
+  }
+
+  select option {
+    background-color: #0C0B0E;
+    color: white;
   }
 }

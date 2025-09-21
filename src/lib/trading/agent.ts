@@ -5,6 +5,7 @@ import type { LiquidityPool, Trade } from '../gswap/types';
 import { TradingStrategy } from './strategies';
 import { TradingLogger } from './logger';
 import { getTradingParams, SIGNAL_THRESHOLDS } from './config';
+import { toast } from '../stores/toast';
 
 export class TradingAgent {
   private client: GSwapClient;
@@ -15,6 +16,7 @@ export class TradingAgent {
   private isRunning = false;
   private intervalId?: NodeJS.Timeout;
   private currentTrades: Map<string, Trade> = new Map();
+  private selectedPool: LiquidityPool | null = null;
 
   constructor(
     client: GSwapClient,
@@ -32,12 +34,23 @@ export class TradingAgent {
   updateConfig(config: TradingConfig) {
     this.config = config;
     this.strategy.updateConfig(config);
-    this.logger.logSystem(`Trading config updated: ${JSON.stringify(config)}`);
 
-    // Restart if running
+    // Log configuration change in a more readable format
+    const configSummary = `Risk: ${config.risk}, Strategy: ${config.strategy}, Speed: ${config.speed}, Signals: ${config.signals}, Bias: ${config.bias}`;
+    this.logger.logSystem(`Configuration updated: ${configSummary}`, 'info');
+
+    // Restart if running to apply new config immediately
     if (this.isRunning) {
+      this.logger.logSystem('Restarting agent with new configuration', 'warning');
       this.stop();
       this.start();
+    }
+  }
+
+  setSelectedPool(pool: LiquidityPool | null) {
+    this.selectedPool = pool;
+    if (pool) {
+      this.logger.logSystem(`Selected trading pool: ${pool.name || pool.id}`, 'info');
     }
   }
 
@@ -49,11 +62,49 @@ export class TradingAgent {
 
     if (!this.wallet.isConnected()) {
       this.logger.logError('Cannot start: Wallet not connected');
+      toast.error('Please connect your wallet before starting trading');
       throw new Error('Wallet not connected');
     }
 
+    if (!this.selectedPool) {
+      this.logger.logError('Cannot start: No pool selected');
+      toast.error('Please select a liquidity pool before starting trading');
+      throw new Error('Please select a liquidity pool to trade');
+    }
+
+    // Check wallet balance for live trading
+    if (!this.config.paperTrading) {
+      try {
+        const balances = await this.wallet.getBalances();
+        const totalValue = balances.reduce((sum, b) => sum + (b.value || 0), 0);
+
+        if (totalValue === 0) {
+          this.logger.logError('Insufficient wallet balance for live trading');
+          toast.error(
+            'Your wallet has no funds! Add funds to your wallet or switch to paper trading mode.',
+            8000
+          );
+          throw new Error('Insufficient wallet balance. Your wallet has no funds for live trading.');
+        }
+
+        if (totalValue < 10) {
+          this.logger.logError('Low wallet balance for live trading');
+          toast.warning(
+            `Low balance detected ($${totalValue.toFixed(2)}). Minimum $10 recommended for effective trading.`,
+            6000
+          );
+        }
+
+        this.logger.logSystem(`Wallet balance verified: $${totalValue.toFixed(2)}`, 'success');
+      } catch (error: any) {
+        this.logger.logError('Failed to verify wallet balance', error);
+        toast.error(`Failed to verify wallet balance: ${error.message || 'Unknown error'}`);
+        throw error;
+      }
+    }
+
     this.isRunning = true;
-    this.logger.logSystem('Trading agent started', 'success');
+    this.logger.logSystem(`Trading agent started on ${this.selectedPool.name || this.selectedPool.id}`, 'success');
 
     const params = getTradingParams(this.config);
 
@@ -86,33 +137,44 @@ export class TradingAgent {
 
   private async executeTradingCycle() {
     try {
-      this.logger.logSystem('Executing trading cycle');
+      if (!this.selectedPool) {
+        this.logger.logSystem('No pool selected, skipping cycle', 'warning');
+        return;
+      }
 
-      // Get pools
-      const pools = await this.client.getPools();
+      const strategyName = this.config.strategy === 'trend' ? 'Trend Following' :
+                           this.config.strategy === 'revert' ? 'Mean Reversion' :
+                           'Range Trading';
+      this.logger.logSystem(`Executing ${strategyName} strategy on ${this.selectedPool.name || this.selectedPool.id}`);
 
       // Get wallet balances
       const balances = await this.wallet.getBalances();
-      const totalValue = balances.reduce((sum, b) => sum + (b.value || 0), 0);
+      const totalValue = this.config.paperTrading ? 10000 : balances.reduce((sum, b) => sum + (b.value || 0), 0);
 
-      // Analyze each pool
-      for (const pool of pools) {
-        // Update price data
-        const price = this.calculatePoolPrice(pool);
-        const volume = parseFloat(pool.volume24h?.toString() || '0');
-        this.strategy.addPriceData(pool.id, price, volume);
+      // Update price data for selected pool
+      const price = this.calculatePoolPrice(this.selectedPool);
+      const volume = parseFloat(this.selectedPool.volume24h?.toString() || '0');
+      this.strategy.addPriceData(this.selectedPool.id, price, volume);
 
-        // Generate signal
-        const signal = this.strategy.generateSignal(pool);
+      // Generate signal for selected pool
+      const signal = this.strategy.generateSignal(this.selectedPool);
 
-        // Log signal
-        this.logger.logSignal(signal);
+      // Log signal
+      this.logger.logSignal(signal);
 
-        // Check if signal meets threshold
-        const threshold = SIGNAL_THRESHOLDS[this.config.signals];
-        if (signal.confidence >= threshold && signal.action !== 'hold') {
-          await this.executeSignal(signal, pool, totalValue);
+      // Check if signal meets threshold
+      const threshold = SIGNAL_THRESHOLDS[this.config.signals];
+      if (signal.confidence >= threshold && signal.action !== 'hold') {
+        // Check balance before executing in live mode
+        if (!this.config.paperTrading) {
+          const params = getTradingParams(this.config);
+          const requiredBalance = totalValue * params.maxPositionSize;
+          if (requiredBalance > totalValue) {
+            this.logger.logSystem('Insufficient balance for trade', 'warning');
+            return;
+          }
         }
+        await this.executeSignal(signal, this.selectedPool, totalValue);
       }
     } catch (error) {
       this.logger.logError('Trading cycle error', error);

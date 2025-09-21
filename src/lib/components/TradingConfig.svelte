@@ -10,18 +10,28 @@
   }
 </script>
 
-<div class="bg-card rounded-xl border border-border p-6">
+<div class="bg-surface-default backdrop-blur-sm rounded-xl border border-border-subtle p-6">
   <h2 class="text-lg font-semibold mb-4 flex items-center justify-between">
-    Trading Configuration
+    <div class="flex items-center gap-3">
+      <span>Trading Configuration</span>
+      {#if $tradingActive}
+        <div class="text-xs text-warning bg-warning/10 px-2 py-1 rounded-full border border-warning/30">
+          🔒 Locked during trading
+        </div>
+      {/if}
+    </div>
     <div class="flex items-center gap-2">
-      <span class="text-sm text-muted-foreground">Paper Trading</span>
+      <span class="text-sm text-muted">Live Trading</span>
       <button
         on:click={() => updateConfig('paperTrading', !$tradingConfig.paperTrading)}
-        class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors {$tradingConfig.paperTrading ? 'bg-primary' : 'bg-secondary'}"
+        disabled={$tradingActive}
+        class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors
+          {$tradingConfig.paperTrading ? 'bg-accent' : 'bg-surface-hover border border-border-subtle'}
+          {$tradingActive ? 'opacity-50 cursor-not-allowed' : ''}"
       >
         <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {$tradingConfig.paperTrading ? 'translate-x-6' : 'translate-x-1'}"></span>
       </button>
-      <span class="text-sm text-muted-foreground">Live Trading</span>
+      <span class="text-sm text-muted">Paper Trading</span>
     </div>
   </h2>
 
@@ -34,17 +44,17 @@
           <button
             on:click={() => updateConfig('risk', risk)}
             disabled={$tradingActive}
-            class="w-full px-3 py-2 rounded-lg border transition-colors text-sm
+            class="w-full px-3 py-2 rounded-lg transition-colors text-sm
               {$tradingConfig.risk === risk
-                ? 'bg-primary text-primary-foreground border-primary'
-                : 'bg-secondary border-border hover:border-primary/50'}
+                ? 'bg-accent text-white border border-accent'
+                : 'bg-surface-hover text-muted hover:text-foreground border border-border-subtle hover:bg-surface-pressed'}
               {$tradingActive ? 'opacity-50 cursor-not-allowed' : ''}"
           >
             <div class="capitalize font-medium">{risk}</div>
             <div class="text-xs opacity-70">
-              {risk === 'safe' ? '10% pos, 2% SL' :
-               risk === 'balanced' ? '25% pos, 5% SL' :
-               '50% pos, 10% SL'}
+              {risk === 'safe' ? '15% pos, 3% SL, 2% TP' :
+               risk === 'balanced' ? '30% pos, 5% SL, 4% TP' :
+               '60% pos, 15% SL, 10% TP'}
             </div>
           </button>
         {/each}
@@ -59,10 +69,10 @@
           <button
             on:click={() => updateConfig('strategy', strategy)}
             disabled={$tradingActive}
-            class="w-full px-3 py-2 rounded-lg border transition-colors text-sm
+            class="w-full px-3 py-2 rounded-lg transition-colors text-sm
               {$tradingConfig.strategy === strategy
-                ? 'bg-primary text-primary-foreground border-primary'
-                : 'bg-secondary border-border hover:border-primary/50'}
+                ? 'bg-accent text-white border border-accent'
+                : 'bg-surface-hover text-muted hover:text-foreground border border-border-subtle hover:bg-surface-pressed'}
               {$tradingActive ? 'opacity-50 cursor-not-allowed' : ''}"
           >
             <div class="capitalize font-medium">
@@ -85,17 +95,17 @@
       <label class="block text-sm font-medium mb-2">Speed</label>
       <div class="space-y-2">
         {#each [
-          { value: 'fast', label: 'Fast', desc: '1 minute' },
-          { value: 'normal', label: 'Normal', desc: '5 minutes' },
-          { value: 'slow', label: 'Slow', desc: '15 minutes' }
+          { value: 'fast', label: 'Scalping', desc: '1 min candles' },
+          { value: 'normal', label: 'Day Trading', desc: '5 min candles' },
+          { value: 'slow', label: 'Position', desc: '1 hour candles' }
         ] as speed}
           <button
             on:click={() => updateConfig('speed', speed.value)}
             disabled={$tradingActive}
-            class="w-full px-3 py-2 rounded-lg border transition-colors text-sm
+            class="w-full px-3 py-2 rounded-lg transition-colors text-sm
               {$tradingConfig.speed === speed.value
-                ? 'bg-primary text-primary-foreground border-primary'
-                : 'bg-secondary border-border hover:border-primary/50'}
+                ? 'bg-accent text-white border border-accent'
+                : 'bg-surface-hover text-muted hover:text-foreground border border-border-subtle hover:bg-surface-pressed'}
               {$tradingActive ? 'opacity-50 cursor-not-allowed' : ''}"
           >
             <div class="font-medium">{speed.label}</div>
@@ -110,17 +120,17 @@
       <label class="block text-sm font-medium mb-2">Signals</label>
       <div class="space-y-2">
         {#each [
-          { value: 'precise', label: 'Precise', desc: '>80% confidence' },
-          { value: 'normal', label: 'Normal', desc: '>60% confidence' },
-          { value: 'active', label: 'Active', desc: '>40% confidence' }
+          { value: 'precise', label: 'Conservative', desc: '3+ indicators' },
+          { value: 'normal', label: 'Moderate', desc: '2+ indicators' },
+          { value: 'active', label: 'Aggressive', desc: '1+ indicator' }
         ] as signal}
           <button
             on:click={() => updateConfig('signals', signal.value)}
             disabled={$tradingActive}
-            class="w-full px-3 py-2 rounded-lg border transition-colors text-sm
+            class="w-full px-3 py-2 rounded-lg transition-colors text-sm
               {$tradingConfig.signals === signal.value
-                ? 'bg-primary text-primary-foreground border-primary'
-                : 'bg-secondary border-border hover:border-primary/50'}
+                ? 'bg-accent text-white border border-accent'
+                : 'bg-surface-hover text-muted hover:text-foreground border border-border-subtle hover:bg-surface-pressed'}
               {$tradingActive ? 'opacity-50 cursor-not-allowed' : ''}"
           >
             <div class="font-medium">{signal.label}</div>
@@ -138,10 +148,10 @@
           <button
             on:click={() => updateConfig('bias', bias)}
             disabled={$tradingActive}
-            class="w-full px-3 py-2 rounded-lg border transition-colors text-sm
+            class="w-full px-3 py-2 rounded-lg transition-colors text-sm
               {$tradingConfig.bias === bias
-                ? 'bg-primary text-primary-foreground border-primary'
-                : 'bg-secondary border-border hover:border-primary/50'}
+                ? 'bg-accent text-white border border-accent'
+                : 'bg-surface-hover text-muted hover:text-foreground border border-border-subtle hover:bg-surface-pressed'}
               {$tradingActive ? 'opacity-50 cursor-not-allowed' : ''}"
           >
             <div class="capitalize font-medium">{bias}</div>

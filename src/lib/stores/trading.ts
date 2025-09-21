@@ -2,6 +2,7 @@ import { writable, derived } from 'svelte/store';
 import type { TradingConfig } from '../trading/config';
 import type { LogEntry } from '../trading/logger';
 import type { WalletConfig } from '../wallet/manager';
+import type { LiquidityPool } from '../gswap/types';
 import { DEFAULT_CONFIG } from '../trading/config';
 
 export const tradingConfig = writable<TradingConfig>(DEFAULT_CONFIG);
@@ -29,11 +30,15 @@ export const tradingStats = writable({
   avgSignalConfidence: 0,
 });
 
-export const liquidityPools = writable<any[]>([]);
+export const liquidityPools = writable<LiquidityPool[]>([]);
+
+export const selectedPool = writable<LiquidityPool | null>(null);
+
+export const initialBalance = writable(500);
 
 export const paperTradingStats = writable({
-  initialBalance: 10000,
-  currentValue: 10000,
+  initialBalance: 500,
+  currentValue: 500,
   profitLoss: 0,
   profitLossPercent: 0,
   totalTrades: 0,
