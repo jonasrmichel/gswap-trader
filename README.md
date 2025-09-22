@@ -4,7 +4,7 @@
 
 <img src="static/logo.png" alt="GSwap Trader" width="256" height="256">
 
-**Your Automated Trading Companion for GSwap DEX**
+**Automated Trading Companion for GSwap DEX**
 
 <img src="docs/screenshots/app-dashboard.png" alt="GSwap Trader Dashboard" width="800" style="margin-top: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
 
