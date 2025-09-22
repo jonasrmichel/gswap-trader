@@ -157,7 +157,9 @@
       "WebFetch(domain:personal.ntu.edu.sg)",
       "WebFetch(domain:api.etherscan.io)",
       "Bash(git branch:*)",
-      "Bash(npm run test-swap:*)"
+      "Bash(npm run test-swap:*)",
+      "Bash(node:*)",
+      "Bash(npm run test-trade:*)"
     ],
     "deny": [],
     "ask": [],

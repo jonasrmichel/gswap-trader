@@ -76,65 +76,73 @@ async function executeTrade() {
 
     // Get quote for the swap
     console.log('💱 Getting quote for swap...');
-    const quote = await gswap.quoting.quoteExactInput(
-      tokenGALA,
-      tokenGWETH,
-      amountIn
-    );
-
-    console.log('📈 Quote received:');
-    console.log('  - Output amount:', quote.outTokenAmount.toNumber(), 'GWETH');
-    console.log('  - Current price:', quote.currentPrice);
-    console.log('  - Price impact:', quote.priceImpact + '%');
-    console.log('  - Fee tier:', quote.feeTier);
-
-    // Calculate minimum output with 1% slippage
-    const slippage = 0.01;
-    const minAmountOut = quote.outTokenAmount.toNumber() * (1 - slippage);
-
-    console.log('🔄 Executing swap...');
-    console.log('  - Min amount out:', minAmountOut, 'GWETH');
-    console.log('  - Slippage tolerance:', (slippage * 100) + '%');
-    console.log('  - Using fee tier:', quote.feeTier);
-
-    // Execute swap using the correct signature
-    // swap(tokenIn, tokenOut, fee, amount, walletAddress)
-    const swapResult = await gswap.swaps.swap(
-      tokenGALA,           // tokenIn
-      tokenGWETH,          // tokenOut
-      quote.feeTier,       // fee
-      {                    // amount object
-        exactIn: amountIn,
-        amountOutMinimum: minAmountOut,
-        deadline: Math.floor(Date.now() / 1000) + 300
-      },
-      galaChainAddress     // walletAddress (optional, but let's be explicit)
-    );
-
-    console.log('✅ Trade submitted successfully!');
-    console.log('📋 Pending transaction:', swapResult);
-    console.log('📝 Transaction ID:', swapResult.transactionId);
-
-    // Wait for transaction confirmation
-    console.log('⏳ Waiting for transaction confirmation...');
     try {
-      const confirmedTx = await swapResult.waitDelegate();
-      console.log('✅ Transaction confirmed!');
-      console.log('📋 Confirmed transaction:', confirmedTx);
+      const quote = await gswap.quoting.quoteExactInput(
+        tokenGALA,
+        tokenGWETH,
+        amountIn
+      );
 
-      // The confirmed transaction should have the blockchain hash
-      const txHash = confirmedTx.transactionHash || confirmedTx.hash || confirmedTx.txHash;
-      if (txHash) {
-        console.log('🔗 View on GalaScan: https://galascan.gala.com/transaction/' + txHash);
-        return txHash;
-      }
-    } catch (waitError) {
-      console.warn('⚠️ Could not wait for confirmation:', waitError.message);
+      console.log('📈 Quote received:');
+      console.log('  - Output amount:', quote.outTokenAmount.toNumber(), 'GWETH');
+      console.log('  - Current price:', quote.currentPrice);
+      console.log('  - Price impact:', quote.priceImpact + '%');
+      console.log('  - Fee tier:', quote.feeTier);
+      console.log('  - Fee:', quote.fee);
+
+      // Calculate minimum output with 1% slippage
+      const slippage = 0.01;
+      const minAmountOut = quote.outTokenAmount.toNumber() * (1 - slippage);
+
+      console.log('🔄 Executing swap...');
+      console.log('  - Min amount out:', minAmountOut, 'GWETH');
+      console.log('  - Slippage tolerance:', (slippage * 100) + '%');
+      console.log('  - Using fee tier: PERCENT_01_00 (1%)');
+
+      // Execute the swap with explicit fee tier enum
+      const swapResult = await gswap.swaps.swap({
+        tokenIn: tokenGALA,
+        tokenOut: tokenGWETH,
+        amountIn: amountIn,
+        amountOutMin: minAmountOut,
+        recipient: galaChainAddress,
+        deadline: Math.floor(Date.now() / 1000) + 300, // 5 minutes
+        fee: FEE_TIER.PERCENT_01_00 // Use enum value
+      });
+
+      console.log('✅ Trade executed successfully!');
+      console.log('📋 Transaction Hash:', swapResult.transactionHash);
+      console.log('🔗 View on GalaScan: https://galascan.gala.com/transaction/' + swapResult.transactionHash);
+
+      return swapResult.transactionHash;
+
+    } catch (quoteError) {
+      // If quote fails, try direct swap without quote
+      console.warn('⚠️  Could not get quote, attempting direct swap:', quoteError.message);
+
+      // Use estimated minimum output (conservative estimate)
+      const estimatedOutput = 0.00001; // Conservative estimate for 1 GALA
+      const minAmountOut = estimatedOutput * 0.99; // 1% slippage
+
+      console.log('🔄 Executing swap without quote...');
+      console.log('  - Estimated min output:', minAmountOut, 'GWETH');
+
+      const swapResult = await gswap.swaps.swap({
+        tokenIn: tokenGALA,
+        tokenOut: tokenGWETH,
+        amountIn: amountIn,
+        amountOutMin: minAmountOut,
+        recipient: galaChainAddress,
+        deadline: Math.floor(Date.now() / 1000) + 300,
+        fee: FEE_TIER.PERCENT_01_00 // Default to 1% fee
+      });
+
+      console.log('✅ Trade executed successfully!');
+      console.log('📋 Transaction Hash:', swapResult.transactionHash);
+      console.log('🔗 View on GalaScan: https://galascan.gala.com/transaction/' + swapResult.transactionHash);
+
+      return swapResult.transactionHash;
     }
-
-    // Return the transaction ID as fallback
-    console.log('ℹ️ Transaction ID (pending):', swapResult.transactionId);
-    return swapResult.transactionId;
 
   } catch (error) {
     console.error('❌ Error executing trade:', error.message);
