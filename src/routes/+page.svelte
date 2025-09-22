@@ -8,6 +8,7 @@
   import TradingStats from '$lib/components/TradingStats.svelte';
   import TradingControls from '$lib/components/TradingControls.svelte';
   import PoolList from '$lib/components/PoolList.svelte';
+  import ChatPanel from '$lib/components/ChatPanel.svelte';
   import {
     tradingActive,
     tradingLogs,
@@ -199,8 +200,11 @@
       <PoolList />
     </div>
 
-    <!-- Trading Log -->
-    <TradingLog />
+    <!-- AI Chat and Trading Log -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <ChatPanel {agent} {logger} />
+      <TradingLog />
+    </div>
   </main>
 </div>
 

@@ -12,12 +12,32 @@
 [![SvelteKit](https://img.shields.io/badge/SvelteKit-5.0-FF3E00.svg)](https://kit.svelte.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6.svg)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-06B6D4.svg)](https://tailwindcss.com/)
+[![Claude Opus](https://img.shields.io/badge/AI-Claude%20Opus-8B5CF6.svg)](https://www.anthropic.com/claude)
 
 </div>
 
 ## 🎯 Overview
 
-GSwap Trader is an intelligent automated trading agent for the GSwap decentralized exchange. It combines advanced trading strategies with real-time market analysis to execute trades 24/7.
+GSwap Trader is an intelligent automated trading agent for the GSwap decentralized exchange. It combines advanced trading strategies with real-time market analysis to execute trades 24/7, now enhanced with an AI assistant powered by Claude Opus.
+
+## 🤖 AI Chat Assistant (NEW!)
+
+**Powered by Claude Opus** - Get intelligent trading assistance with our built-in AI chat:
+
+### Chat Features
+- **💬 Natural Language Interaction** - Ask questions about trading strategies and market conditions
+- **🎯 Smart Commands** - Control your bot with slash commands:
+  - `/start` - Begin automated trading
+  - `/stop` - Pause trading operations
+  - `/stats` - View performance metrics
+  - `/balance` - Check wallet balances
+  - `/config` - Review current settings
+  - `/risk <level>` - Adjust risk profile
+  - `/strategy <type>` - Change trading strategy
+  - `/paper <on/off>` - Toggle paper trading
+- **📊 Market Analysis** - Get real-time insights on GALA, GWETH, and GUSDC pairs
+- **💡 Strategy Recommendations** - Receive personalized trading advice
+- **⚡ Quick Actions** - One-click buttons for common operations
 
 ## ✨ Features
 
