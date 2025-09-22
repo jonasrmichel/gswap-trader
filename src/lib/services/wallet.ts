@@ -381,19 +381,20 @@ class WalletService {
     try {
       const balances: WalletBalance[] = [];
 
-      // Also fetch GalaChain balances
+      // Fetch GalaChain balances first (so they appear at the top)
       try {
         const galaChainAddress = `eth|${state.address.slice(2)}`;
         console.log('[Wallet] Fetching GalaChain balances for:', galaChainAddress);
 
         const response = await fetch(`https://dex-backend-prod1.defi.gala.com/user/assets?address=${galaChainAddress}&page=1&limit=20`);
         if (response.ok) {
-          const data = await response.json();
-          if (data.tokens && data.tokens.length > 0) {
-            console.log('[Wallet] GalaChain assets found:', data.tokens);
+          const result = await response.json();
+          // The API returns data.token (not data.tokens)
+          if (result.data && result.data.token && result.data.token.length > 0) {
+            console.log('[Wallet] GalaChain assets found:', result.data.token);
 
             // Add GalaChain tokens to balances
-            for (const token of data.tokens) {
+            for (const token of result.data.token) {
               // Try to get token price for value calculation
               let value = 0;
               try {
