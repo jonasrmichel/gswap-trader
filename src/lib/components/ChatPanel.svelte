@@ -357,33 +357,14 @@
             removeTypingIndicator();
             console.error('Chat error:', error);
 
-            // Provide a helpful mock response
-            const mockResponse = generateMockResponse(userMessage);
+            // Show error message
             addMessage({
                 role: 'assistant',
-                content: mockResponse
+                content: '❌ Failed to send message. Please check the console for details.'
             });
         } finally {
             isLoading.set(false);
         }
-    }
-
-    function generateMockResponse(input: string): string {
-        const lower = input.toLowerCase();
-
-        if (lower.includes('gala') || lower.includes('market')) {
-            return 'GALA is currently showing strong momentum with increased trading volume. The GALA/GWETH pair has good liquidity on GSwap. Consider using a balanced risk approach with 30% position sizing for optimal risk/reward.';
-        }
-
-        if (lower.includes('strategy') || lower.includes('trading')) {
-            return 'For GSwap trading, I recommend:\n\n1. **Trend Following** for strong directional markets\n2. **Mean Reversion** when price oscillates in a range\n3. **Range Trading** for stable, sideways markets\n\nEach strategy has optimal market conditions. Would you like me to analyze current conditions?';
-        }
-
-        if (lower.includes('risk') || lower.includes('position')) {
-            return 'Risk management is crucial. I suggest:\n• Safe mode: 15% position, 3% stop loss\n• Balanced: 30% position, 5% stop loss\n• Aggressive: 60% position, 15% stop loss\n\nAlways consider your total portfolio exposure.';
-        }
-
-        return 'I can help you optimize your GSwap trading strategy. Try asking about market conditions, trading strategies, or use commands like /start to begin trading.';
     }
 
     function handleQuickAction(action: QuickAction) {
@@ -397,6 +378,48 @@
             sendMessage();
         }
     }
+
+    function renderMarkdown(content: string): string {
+        // Basic markdown to HTML conversion
+        let html = content
+            // Escape HTML
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            // Headers
+            .replace(/^### (.*$)/gim, '<h3 class="font-semibold text-base mt-3 mb-2">$1</h3>')
+            .replace(/^## (.*$)/gim, '<h2 class="font-semibold text-lg mt-3 mb-2">$1</h2>')
+            .replace(/^# (.*$)/gim, '<h1 class="font-bold text-xl mt-3 mb-2">$1</h1>')
+            // Bold
+            .replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold">$1</strong>')
+            // Italic
+            .replace(/\*(.+?)\*/g, '<em>$1</em>')
+            // Links
+            .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-accent hover:underline" target="_blank" rel="noopener">$1</a>')
+            // Inline code
+            .replace(/`([^`]+)`/g, '<code class="px-1 py-0.5 bg-surface-hover rounded text-accent text-xs font-mono">$1</code>')
+            // Line breaks
+            .replace(/\n/g, '<br>')
+            // Lists - unordered
+            .replace(/^[\s]*\* (.+)$/gim, '<li class="ml-4 list-disc">$1</li>')
+            .replace(/^[\s]*- (.+)$/gim, '<li class="ml-4 list-disc">$1</li>')
+            .replace(/^[\s]*• (.+)$/gim, '<li class="ml-4 list-disc">$1</li>')
+            // Lists - ordered
+            .replace(/^[\s]*\d+\. (.+)$/gim, '<li class="ml-4 list-decimal">$1</li>')
+            // Wrap consecutive list items
+            .replace(/(<li class="ml-4 list-disc">.*?<\/li>(<br>)?)+/g, (match) =>
+                `<ul class="my-2 space-y-1">${match.replace(/<br>/g, '')}</ul>`)
+            .replace(/(<li class="ml-4 list-decimal">.*?<\/li>(<br>)?)+/g, (match) =>
+                `<ol class="my-2 space-y-1">${match.replace(/<br>/g, '')}</ol>`);
+
+        // Code blocks
+        html = html.replace(/```([\s\S]*?)```/g, (match, code) => {
+            const cleanCode = code.trim().replace(/<br>/g, '\n');
+            return `<pre class="bg-surface-default rounded p-3 my-2 overflow-x-auto"><code class="text-xs font-mono">${cleanCode}</code></pre>`;
+        });
+
+        return html;
+    }
 </script>
 
 <div class="bg-card-darker rounded-lg border border-border-subtle p-4 h-full flex flex-col">
@@ -406,7 +429,7 @@
             <div class="flex items-center gap-2">
                 <div class="w-2 h-2 bg-success rounded-full animate-pulse"></div>
                 <h3 class="text-lg font-semibold text-accent">AI Assistant</h3>
-                <span class="text-xs text-muted">Claude Opus</span>
+                <span class="text-xs text-muted">GPT-4 Turbo</span>
             </div>
             <button
                 on:click={() => showCommands = !showCommands}
@@ -457,7 +480,9 @@
                             <div class="w-2 h-2 bg-accent rounded-full animate-bounce" style="animation-delay: 300ms;"></div>
                         </div>
                     {:else}
-                        <div class="text-sm whitespace-pre-wrap">{@html message.content.replace(/`([^`]+)`/g, '<code class="px-1 py-0.5 bg-surface-hover rounded text-accent">$1</code>')}</div>
+                        <div class="text-sm">
+                            {@html renderMarkdown(message.content)}
+                        </div>
                         <div class="text-xs text-muted mt-1">
                             {message.timestamp.toLocaleTimeString()}
                         </div>

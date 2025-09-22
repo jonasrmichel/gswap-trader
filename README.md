@@ -12,17 +12,17 @@
 [![SvelteKit](https://img.shields.io/badge/SvelteKit-5.0-FF3E00.svg)](https://kit.svelte.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6.svg)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-06B6D4.svg)](https://tailwindcss.com/)
-[![Claude Opus](https://img.shields.io/badge/AI-Claude%20Opus-8B5CF6.svg)](https://www.anthropic.com/claude)
+[![GPT-4](https://img.shields.io/badge/AI-GPT--4%20Turbo-10A37F.svg)](https://platform.openai.com/)
 
 </div>
 
 ## 🎯 Overview
 
-GSwap Trader is an intelligent automated trading agent for the GSwap decentralized exchange. It combines advanced trading strategies with real-time market analysis to execute trades 24/7, now enhanced with an AI assistant powered by Claude Opus.
+GSwap Trader is an intelligent automated trading agent for the GSwap decentralized exchange. It combines advanced trading strategies with real-time market analysis to execute trades 24/7, now enhanced with an AI assistant powered by GPT-4 Turbo.
 
 ## 🤖 AI Chat Assistant (NEW!)
 
-**Powered by Claude Opus** - Get intelligent trading assistance with our built-in AI chat:
+**Powered by GPT-4 Turbo** - Get intelligent trading assistance with our built-in AI chat:
 
 ### Chat Features
 - **💬 Natural Language Interaction** - Ask questions about trading strategies and market conditions
