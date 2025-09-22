@@ -33,7 +33,7 @@
   function getExplorerUrl(txHash: string): string {
     // For GalaChain transactions, use GalaScan
     // GalaChain transaction hashes are typically UUIDs or alphanumeric strings
-    return `https://galascan.gala.com/tx/${txHash}`;
+    return `https://galascan.gala.com/transaction/${txHash}`;
   }
 
   function formatTxHash(hash: string): string {
