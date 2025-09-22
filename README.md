@@ -17,7 +17,7 @@
 
 ## 🎯 Overview
 
-GSwap Trader is an intelligent automated trading agent for the GSwap decentralized exchange. It combines advanced trading strategies with real-time market analysis to execute trades 24/7, all wrapped in a beautiful dark-themed interface.
+GSwap Trader is an intelligent automated trading agent for the GSwap decentralized exchange. It combines advanced trading strategies with real-time market analysis to execute trades 24/7.
 
 ## ✨ Features
 
