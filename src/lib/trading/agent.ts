@@ -388,7 +388,8 @@ export class TradingAgent {
           trade.status = 'success';
           trade.profit = this.calculateProfit(trade, pool);
 
-          this.logger.logSystem(`Live trade executed: ${txHash}`, 'success');
+          this.logger.logSystem(`Live trade executed on GalaChain: ${txHash}`, 'success');
+          this.logger.logSystem(`View on GalaScan: https://galascan.gala.com/tx/${txHash}`, 'info');
         } catch (swapError: any) {
           trade.status = 'failed';
           this.logger.logError(`Failed to execute swap: ${swapError.message}`, swapError);

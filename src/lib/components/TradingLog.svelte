@@ -31,21 +31,9 @@
   }
 
   function getExplorerUrl(txHash: string): string {
-    // Get chain ID from wallet store
-    const chainId = $walletStore.chainId || 1;
-
-    // Map chain IDs to explorer URLs
-    const explorers: { [key: number]: string } = {
-      1: 'https://etherscan.io/tx/', // Ethereum Mainnet
-      56: 'https://bscscan.com/tx/', // BSC Mainnet
-      137: 'https://polygonscan.com/tx/', // Polygon
-      42161: 'https://arbiscan.io/tx/', // Arbitrum
-      43114: 'https://snowtrace.io/tx/', // Avalanche
-      10: 'https://optimistic.etherscan.io/tx/', // Optimism
-    };
-
-    const baseUrl = explorers[chainId] || 'https://etherscan.io/tx/';
-    return baseUrl + txHash;
+    // For GalaChain transactions, use GalaScan
+    // GalaChain transaction hashes are typically UUIDs or alphanumeric strings
+    return `https://galascan.gala.com/tx/${txHash}`;
   }
 
   function formatTxHash(hash: string): string {
@@ -100,12 +88,13 @@
                 <div>{log.details.amountIn} {log.details.tokenIn} → {log.details.amountOut} {log.details.tokenOut}</div>
                 {#if log.details.txHash}
                   <div class="mt-1">
-                    Transaction:
+                    GalaChain TX:
                     <a
                       href={getExplorerUrl(log.details.txHash)}
                       target="_blank"
                       rel="noopener noreferrer"
                       class="text-accent hover:text-accent/80 underline inline-flex items-center gap-1"
+                      title="View on GalaScan"
                     >
                       {formatTxHash(log.details.txHash)}
                       <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
