@@ -8,8 +8,11 @@ import { ethers } from 'ethers';
 export function formatTokenForGSwap(symbol: string): string {
   // Convert simple token symbol to GSwap format
   // Special handling for wrapped tokens
-  if (symbol === 'ETH' || symbol === 'WETH') {
+  if (symbol === 'ETH' || symbol === 'WETH' || symbol === 'GWETH') {
     return 'GWETH|Unit|none|none';
+  }
+  if (symbol === 'GALA') {
+    return 'GALA|Unit|none|none';
   }
   if (symbol === 'USDC' || symbol === 'GUSDC') {
     return 'GUSDC|Unit|none|none';
@@ -88,16 +91,19 @@ export class GSwapSDKClient {
       // Create MetaMaskSigner wrapper
       this.signer = new MetaMaskSigner(ethersSigner);
 
-      // Create GSwap instance with MetaMask signer
-      this.gswap = new GSwap({
-        signer: this.signer,
-      });
-
       // Get address from signer
       this.address = await ethersSigner.getAddress();
+      const galaChainAddress = `eth|${this.address.slice(2)}`;
+
+      // Create GSwap instance with MetaMask signer and GalaChain formatted address
+      this.gswap = new GSwap({
+        signer: this.signer,
+        walletAddress: galaChainAddress,
+      });
+
       this.connected = true;
 
-      console.log('Connected to GSwap SDK with MetaMask signer');
+      console.log('Connected to GSwap SDK with MetaMask signer, address:', galaChainAddress);
     } catch (error) {
       console.error('Failed to connect GSwap with MetaMask:', error);
       throw error;
