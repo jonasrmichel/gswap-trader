@@ -1,4 +1,5 @@
 <script lang="ts">
+  import '$lib/utils/polyfills';
   import { onMount, onDestroy } from 'svelte';
   import WalletConnect from '$lib/components/WalletConnect.svelte';
   import WalletBalancePanel from '$lib/components/WalletBalancePanel.svelte';
@@ -19,14 +20,15 @@
     selectedPool,
     initialBalance
   } from '$lib/stores/trading';
-  import { GSwapClient } from '$lib/gswap/client';
+  // GSwapClient removed - using GSwap SDK exclusively for GalaChain
+  import { GSwapSDKClient } from '$lib/gswap/gswap-sdk-client';
   import { WalletManager } from '$lib/wallet/manager';
   import { TradingAgent } from '$lib/trading/agent';
   import { TradingLogger } from '$lib/trading/logger';
   import { PaperTradingManager } from '$lib/trading/paper-trading';
   import { initializeWallet } from '$lib/services/wallet';
 
-  let client: GSwapClient | null = null;
+  let client: GSwapSDKClient | null = null;
   let wallet: WalletManager | null = null;
   let agent: TradingAgent | null = null;
   let logger: TradingLogger | null = null;
@@ -36,8 +38,21 @@
     // Initialize wallet service (will auto-connect if env key is set)
     await initializeWallet();
 
-    // Initialize services
-    client = new GSwapClient();
+    // Initialize GSwap SDK for GalaChain trading
+    console.log('Initializing GSwap SDK for GalaChain trading');
+    client = new GSwapSDKClient();
+
+    // Auto-connect with private key if provided
+    if (import.meta.env.VITE_WALLET_PRIVATE_KEY) {
+      try {
+        await client.connect(import.meta.env.VITE_WALLET_PRIVATE_KEY);
+        console.log('Connected to GSwap SDK with private key');
+        isWalletConnected.set(true);
+      } catch (error) {
+        console.error('Failed to connect to GSwap SDK:', error);
+      }
+    }
+
     wallet = new WalletManager(client);
     logger = new TradingLogger();
     paperManager = new PaperTradingManager($initialBalance);
@@ -57,7 +72,7 @@
 
     // Simulate some initial logs
     logger.logSystem('GSwap Trader initialized', 'success');
-    logger.logSystem('Connected to BSC network');
+    logger.logSystem('Connected to GalaChain network');
 
     // Apply default settings from env
     if (import.meta.env.VITE_DEFAULT_PAPER_TRADING !== undefined) {
@@ -99,7 +114,7 @@
     };
   });
 
-  $: if ($isWalletConnected && !agent && client && wallet && logger) {
+  $: if ($isWalletConnected && !agent && client && wallet && logger && paperManager) {
     agent = new TradingAgent(client, wallet, $tradingConfig, logger, paperManager);
     if ($selectedPool) {
       agent.setSelectedPool($selectedPool);
@@ -109,6 +124,10 @@
   // Update agent config when it changes
   $: if (agent && $tradingConfig && logger) {
     agent.updateConfig($tradingConfig);
+    // Also update paper manager if switching modes
+    if (paperManager && agent) {
+      agent.setPaperManager(paperManager);
+    }
   }
 
   // Update agent's selected pool when it changes

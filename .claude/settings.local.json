@@ -154,7 +154,10 @@
       "Bash(git merge:*)",
       "WebFetch(domain:chat.snichols.io)",
       "WebFetch(domain:www.osmi.ai)",
-      "WebFetch(domain:personal.ntu.edu.sg)"
+      "WebFetch(domain:personal.ntu.edu.sg)",
+      "WebFetch(domain:api.etherscan.io)",
+      "Bash(git branch:*)",
+      "Bash(npm run test-swap:*)"
     ],
     "deny": [],
     "ask": [],

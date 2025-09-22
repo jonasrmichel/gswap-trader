@@ -18,13 +18,16 @@ export class PaperTradingManager {
     // Use current market prices
     const galaPrice = 0.01751;
     const bnbPrice = 600;
+    const ethPrice = 2600;
     const usdcPrice = 1;
 
     this.wallet = {
       balances: new Map([
-        ['USDC', initialBalance * 0.5],
-        ['BNB', initialBalance * 0.25 / bnbPrice],
-        ['GALA', initialBalance * 0.25 / galaPrice],
+        ['USDC', initialBalance * 0.4],        // 40% in USDC
+        ['ETH', initialBalance * 0.2 / ethPrice],  // 20% in ETH
+        ['GALA', initialBalance * 0.2 / galaPrice], // 20% in GALA
+        ['BNB', initialBalance * 0.1 / bnbPrice],   // 10% in BNB
+        ['USDT', initialBalance * 0.1],         // 10% in USDT
       ]),
       initialBalance,
       currentValue: initialBalance,
@@ -36,7 +39,7 @@ export class PaperTradingManager {
     this.prices.set('USDT', 1);
     this.prices.set('BNB', bnbPrice);
     this.prices.set('GALA', galaPrice);
-    this.prices.set('ETH', 3500);
+    this.prices.set('ETH', ethPrice);
   }
 
   getBalance(token: string): number {
@@ -77,6 +80,13 @@ export class PaperTradingManager {
     this.wallet.balances.set(tokenIn, balanceIn - amountIn);
     this.wallet.balances.set(tokenOut, this.getBalance(tokenOut) + amountOut);
 
+    // Generate a realistic-looking transaction hash for paper trades
+    const generatePaperTxHash = () => {
+      const timestamp = Date.now().toString(16);
+      const random = Math.random().toString(16).substring(2, 10);
+      return `0xpaper${timestamp}${random}`.padEnd(66, '0');
+    };
+
     // Create trade record
     const trade: Trade = {
       id: 'paper_' + Date.now().toString(36),
@@ -87,6 +97,7 @@ export class PaperTradingManager {
       amountIn: amountIn.toString(),
       amountOut: amountOut.toString(),
       status: 'success',
+      txHash: generatePaperTxHash(),
       profit: this.calculateProfit(tokenIn, tokenOut, amountIn, amountOut),
     };
 

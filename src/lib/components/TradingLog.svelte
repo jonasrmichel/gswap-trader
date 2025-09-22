@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { tradingLogs } from '$lib/stores/trading';
+  import { tradingLogs, isWalletConnected, walletBalances } from '$lib/stores/trading';
+  import { walletStore } from '$lib/services/wallet';
   import type { LogEntry } from '$lib/trading/logger';
 
   function getLevelColor(level: string) {
@@ -27,6 +28,30 @@
       minute: '2-digit',
       second: '2-digit'
     });
+  }
+
+  function getExplorerUrl(txHash: string): string {
+    // Get chain ID from wallet store
+    const chainId = $walletStore.chainId || 1;
+
+    // Map chain IDs to explorer URLs
+    const explorers: { [key: number]: string } = {
+      1: 'https://etherscan.io/tx/', // Ethereum Mainnet
+      56: 'https://bscscan.com/tx/', // BSC Mainnet
+      137: 'https://polygonscan.com/tx/', // Polygon
+      42161: 'https://arbiscan.io/tx/', // Arbitrum
+      43114: 'https://snowtrace.io/tx/', // Avalanche
+      10: 'https://optimistic.etherscan.io/tx/', // Optimism
+    };
+
+    const baseUrl = explorers[chainId] || 'https://etherscan.io/tx/';
+    return baseUrl + txHash;
+  }
+
+  function formatTxHash(hash: string): string {
+    if (!hash) return '';
+    if (hash.length <= 12) return hash;
+    return `${hash.slice(0, 6)}...${hash.slice(-4)}`;
   }
 </script>
 
@@ -73,6 +98,22 @@
               {:else if log.type === 'trade' && log.details}
                 <div>Status: <span class="{log.details.status === 'success' ? 'text-success' : 'text-destructive'}">{log.details.status}</span></div>
                 <div>{log.details.amountIn} {log.details.tokenIn} → {log.details.amountOut} {log.details.tokenOut}</div>
+                {#if log.details.txHash}
+                  <div class="mt-1">
+                    Transaction:
+                    <a
+                      href={getExplorerUrl(log.details.txHash)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="text-accent hover:text-accent/80 underline inline-flex items-center gap-1"
+                    >
+                      {formatTxHash(log.details.txHash)}
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                    </a>
+                  </div>
+                {/if}
                 {#if log.details.profit}
                   <div>Profit: <span class="{log.details.profit > 0 ? 'text-success' : 'text-destructive'}">{log.details.profit.toFixed(2)}%</span></div>
                 {/if}

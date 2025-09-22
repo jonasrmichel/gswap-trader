@@ -1,5 +1,5 @@
 import { ethers } from 'ethers';
-import type { GSwapClient } from '../gswap/client';
+import type { GSwapSDKClient } from '../gswap/gswap-sdk-client';
 import { walletStore, type WalletState } from '../services/wallet';
 import { get } from 'svelte/store';
 
@@ -18,26 +18,32 @@ export interface WalletBalance {
 }
 
 export class WalletManager {
-  private client: GSwapClient;
+  private client: GSwapSDKClient;
   private config: WalletConfig | null = null;
   private walletState: WalletState | null = null;
   private connected: boolean = false;
 
-  constructor(client: GSwapClient) {
+  constructor(client: GSwapSDKClient) {
     this.client = client;
     // Subscribe to wallet store changes
-    walletStore.subscribe(state => {
+    walletStore.subscribe(async state => {
       this.walletState = state;
-      // Sync connected state
+      // Sync connected state and pass signer to GSwap client
       if (state.connected && state.address) {
         this.connected = true;
         this.config = {
           type: 'metamask',
           address: state.address
         };
+        // Pass signer to GSwap client when wallet connects
+        if (state.signer) {
+          await this.client.setSigner(state.signer);
+        }
       } else {
         this.connected = false;
         this.config = null;
+        // Clear signer when wallet disconnects
+        await this.client.setSigner(null);
       }
     });
   }
@@ -125,39 +131,49 @@ export class WalletManager {
       ];
     }
 
-    // Get real balances from blockchain
+    // Get real balances from GalaChain
     const walletAddress = this.getAddress();
     if (!walletAddress) {
       console.error('No wallet address available for balance check');
       return [];
     }
 
-    const tokens = [
-      { symbol: 'BNB', address: ethers.ZeroAddress, price: 600 },
-      { symbol: 'GALA', address: '0xd1d2eb1b1e90b638588728b4130137d262c87cae', price: 0.01751 },
-      { symbol: 'USDC', address: '0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d', price: 1 },
-      { symbol: 'USDT', address: '0x55d398326f99059ff775485246999027b3197955', price: 1 },
-      { symbol: 'ETH', address: '0x2170ed0880ac9a755fd29b2688956bd959f933f8', price: 3500 },
-    ];
+    try {
+      // Use GSwap SDK's getUserAssets to fetch all balances at once
+      const assets = await this.client.getUserAssets(walletAddress);
 
-    const balances: WalletBalance[] = [];
+      // Map the assets to our wallet balance format
+      const balances: WalletBalance[] = assets.tokens.map((token: any) => {
+        // Get approximate USD values (in production, use real price API)
+        const prices: Record<string, number> = {
+          'GALA': 0.02,
+          'GWETH': 3500,
+          'GUSDC': 1,
+          'GUSDT': 1
+        };
 
-    for (const token of tokens) {
-      try {
-        const balance = await this.client.getBalance(token.address, walletAddress);
-        const value = parseFloat(balance) * token.price;
-        balances.push({
+        const price = prices[token.symbol] || 0;
+        const quantity = parseFloat(token.quantity || '0');
+
+        return {
           token: token.symbol,
-          balance,
-          value
-        });
-      } catch (error) {
-        console.error(`Error getting ${token.symbol} balance:`, error);
-        balances.push({ token: token.symbol, balance: '0', value: 0 });
-      }
-    }
+          balance: token.quantity,
+          value: quantity * price
+        };
+      });
 
-    return balances;
+      return balances;
+    } catch (error) {
+      console.error('Failed to fetch GalaChain balances:', error);
+
+      // Return empty balances for common tokens if API fails
+      return [
+        { token: 'GALA', balance: '0', value: 0 },
+        { token: 'GWETH', balance: '0', value: 0 },
+        { token: 'GUSDC', balance: '0', value: 0 },
+        { token: 'GUSDT', balance: '0', value: 0 }
+      ];
+    }
   }
 
   async signTransaction(tx: any): Promise<string> {

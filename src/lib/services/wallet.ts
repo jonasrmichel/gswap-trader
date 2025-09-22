@@ -179,11 +179,55 @@ class WalletService {
       // Create provider and signer with the selected account
       const provider = new ethers.BrowserProvider(this.ethereum);
 
-      // Try to switch to Ethereum mainnet
+      // Try to switch to the configured network
+      const targetChain = import.meta.env.VITE_TARGET_CHAIN || 'ethereum';
+      let chainConfig;
+
+      switch (targetChain) {
+        case 'galachain':
+          chainConfig = {
+            chainId: '0x539', // 1337 in hex for GalaChain
+            chainName: 'GalaChain',
+            nativeCurrency: {
+              name: 'GALA',
+              symbol: 'GALA',
+              decimals: 18
+            },
+            rpcUrls: [import.meta.env.VITE_GALACHAIN_RPC_URL || 'https://rpc.galachain.com'],
+            blockExplorerUrls: ['https://explorer.galachain.com/']
+          };
+          break;
+        case 'bsc':
+          chainConfig = {
+            chainId: '0x38', // 56 in hex
+            chainName: 'BSC Mainnet',
+            nativeCurrency: {
+              name: 'BNB',
+              symbol: 'BNB',
+              decimals: 18
+            },
+            rpcUrls: ['https://bsc-dataseed1.binance.org'],
+            blockExplorerUrls: ['https://bscscan.com/']
+          };
+          break;
+        default: // ethereum
+          chainConfig = {
+            chainId: '0x1',
+            chainName: 'Ethereum Mainnet',
+            nativeCurrency: {
+              name: 'Ether',
+              symbol: 'ETH',
+              decimals: 18
+            },
+            rpcUrls: ['https://eth.llamarpc.com'],
+            blockExplorerUrls: ['https://etherscan.io/']
+          };
+      }
+
       try {
         await this.ethereum.request({
           method: 'wallet_switchEthereumChain',
-          params: [{ chainId: '0x1' }] // Ethereum mainnet
+          params: [{ chainId: chainConfig.chainId }]
         });
       } catch (switchError: any) {
         // This error code indicates that the chain has not been added to MetaMask
@@ -191,20 +235,10 @@ class WalletService {
           try {
             await this.ethereum.request({
               method: 'wallet_addEthereumChain',
-              params: [{
-                chainId: '0x1',
-                chainName: 'Ethereum Mainnet',
-                nativeCurrency: {
-                  name: 'Ether',
-                  symbol: 'ETH',
-                  decimals: 18
-                },
-                rpcUrls: ['https://eth.llamarpc.com'],
-                blockExplorerUrls: ['https://etherscan.io/']
-              }]
+              params: [chainConfig]
             });
           } catch (addError) {
-            console.error('Failed to add Ethereum mainnet:', addError);
+            console.error(`Failed to add ${chainConfig.chainName}:`, addError);
           }
         }
       }

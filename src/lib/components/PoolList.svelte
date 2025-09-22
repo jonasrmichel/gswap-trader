@@ -2,11 +2,11 @@
   import { onMount, onDestroy } from 'svelte';
   import { liquidityPools, selectedPool, tradingActive } from '$lib/stores/trading';
   import type { LiquidityPool } from '$lib/gswap/types';
-  import { GSwapClient } from '$lib/gswap/client';
+  import { GSwapSDKClient } from '$lib/gswap/gswap-sdk-client';
 
   let searchQuery = '';
   let filteredPools: LiquidityPool[] = [];
-  let client: GSwapClient | null = null;
+  let client: GSwapSDKClient | null = null;
   let priceUpdateInterval: number | null = null;
   let isLoadingPrices = false;
   let lastPriceUpdate: Date | null = null;
@@ -56,7 +56,18 @@
   }
 
   onMount(async () => {
-    client = new GSwapClient();
+    // Create GSwap SDK client instance
+    client = new GSwapSDKClient();
+
+    // Connect with private key if available for pool fetching
+    if (import.meta.env.VITE_WALLET_PRIVATE_KEY) {
+      try {
+        await client.connect(import.meta.env.VITE_WALLET_PRIVATE_KEY);
+      } catch (error) {
+        console.error('Failed to connect GSwap SDK for pool fetching:', error);
+      }
+    }
+
     await updatePools();
 
     // Update prices every 60 seconds
@@ -82,7 +93,7 @@
         </div>
       {:else if lastPriceUpdate}
         <div class="text-xs text-muted">
-          Prices from CoinGecko
+          GalaChain Pools via GSwap
         </div>
       {/if}
       {#if $tradingActive}
