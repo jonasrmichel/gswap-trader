@@ -2,6 +2,8 @@
   import { walletStore, walletService } from '$lib/services/wallet';
   import { walletBalances } from '$lib/stores/trading';
 
+  $: galaChainBalances = $walletBalances.filter(b => b.token.includes('(GalaChain)'));
+  $: otherBalances = $walletBalances.filter(b => !b.token.includes('(GalaChain)'));
   $: totalValue = $walletBalances.reduce((sum, b) => sum + (b.value || 0), 0);
   $: hasBalances = $walletBalances && $walletBalances.length > 0;
 
@@ -18,6 +20,19 @@
 
   async function refreshBalances() {
     await walletService.updateBalances();
+  }
+
+  function formatBalance(balance: string): string {
+    const num = parseFloat(balance || '0');
+    if (num === 0) return '0';
+    if (num < 0.000001) return '<0.000001';
+    if (num < 1) return num.toFixed(6);
+    if (num < 1000) return num.toFixed(4);
+    return num.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  }
+
+  function getTokenDisplayName(token: string): string {
+    return token.replace(' (GalaChain)', '');
   }
 </script>
 
@@ -44,33 +59,77 @@
     </div>
 
     {#if hasBalances}
-      <div class="space-y-2">
-        {#each $walletBalances as balance}
-          <div class="flex items-center justify-between py-1">
-            <div class="flex items-center gap-2">
-              <span class="text-sm font-medium text-foreground">{balance.token}</span>
+      <div class="space-y-3">
+        <!-- GalaChain Balances Section -->
+        {#if galaChainBalances.length > 0}
+          <div>
+            <div class="flex items-center gap-2 mb-2">
+              <div class="w-2 h-2 bg-accent rounded-full animate-pulse"></div>
+              <span class="text-xs font-semibold text-accent uppercase tracking-wider">GalaChain</span>
             </div>
-            <div class="text-right">
-              <div class="text-sm font-mono text-foreground">
-                {parseFloat(balance.balance || '0').toFixed(6)}
-              </div>
-              {#if balance.value}
-                <div class="text-xs text-muted">
-                  ${balance.value.toFixed(2)}
+            <div class="space-y-2 pl-4 border-l-2 border-accent/20">
+              {#each galaChainBalances as balance}
+                <div class="flex items-center justify-between py-1">
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm font-medium text-foreground">{getTokenDisplayName(balance.token)}</span>
+                  </div>
+                  <div class="text-right">
+                    <div class="text-sm font-mono text-foreground">
+                      {formatBalance(balance.balance)}
+                    </div>
+                    {#if balance.value && balance.value > 0}
+                      <div class="text-xs text-muted">
+                        ${balance.value.toFixed(2)}
+                      </div>
+                    {/if}
+                  </div>
                 </div>
-              {/if}
+              {/each}
             </div>
           </div>
-        {/each}
+        {/if}
 
-        <div class="pt-2 mt-2 border-t border-border-subtle">
-          <div class="flex items-center justify-between">
-            <span class="text-sm font-semibold text-foreground">Total Value</span>
-            <span class="text-sm font-bold text-accent">
-              ${totalValue.toFixed(2)}
-            </span>
+        <!-- Other Network Balances -->
+        {#if otherBalances.length > 0}
+          <div>
+            {#if galaChainBalances.length > 0}
+              <div class="flex items-center gap-2 mb-2 mt-3">
+                <div class="w-2 h-2 bg-primary rounded-full"></div>
+                <span class="text-xs font-semibold text-primary uppercase tracking-wider">{networkName}</span>
+              </div>
+            {/if}
+            <div class="space-y-2 {galaChainBalances.length > 0 ? 'pl-4 border-l-2 border-primary/20' : ''}">
+              {#each otherBalances as balance}
+                <div class="flex items-center justify-between py-1">
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm font-medium text-foreground">{balance.token}</span>
+                  </div>
+                  <div class="text-right">
+                    <div class="text-sm font-mono text-foreground">
+                      {formatBalance(balance.balance)}
+                    </div>
+                    {#if balance.value}
+                      <div class="text-xs text-muted">
+                        ${balance.value.toFixed(2)}
+                      </div>
+                    {/if}
+                  </div>
+                </div>
+              {/each}
+            </div>
           </div>
-        </div>
+        {/if}
+
+        {#if totalValue > 0}
+          <div class="pt-2 mt-2 border-t border-border-subtle">
+            <div class="flex items-center justify-between">
+              <span class="text-sm font-semibold text-foreground">Total Value</span>
+              <span class="text-sm font-bold text-accent">
+                ${totalValue.toFixed(2)}
+              </span>
+            </div>
+          </div>
+        {/if}
       </div>
     {:else}
       <div class="text-center py-4">

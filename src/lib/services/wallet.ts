@@ -381,6 +381,40 @@ class WalletService {
     try {
       const balances: WalletBalance[] = [];
 
+      // Also fetch GalaChain balances
+      try {
+        const galaChainAddress = `eth|${state.address.slice(2)}`;
+        console.log('[Wallet] Fetching GalaChain balances for:', galaChainAddress);
+
+        const response = await fetch(`https://dex-backend-prod1.defi.gala.com/user/assets?address=${galaChainAddress}&page=1&limit=20`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.tokens && data.tokens.length > 0) {
+            console.log('[Wallet] GalaChain assets found:', data.tokens);
+
+            // Add GalaChain tokens to balances
+            for (const token of data.tokens) {
+              // Try to get token price for value calculation
+              let value = 0;
+              try {
+                const price = await this.fetchTokenPrice(token.symbol);
+                value = parseFloat(token.quantity) * price;
+              } catch (e) {
+                // Price not available
+              }
+
+              balances.push({
+                token: `${token.symbol} (GalaChain)`,
+                balance: token.quantity,
+                value: value
+              });
+            }
+          }
+        }
+      } catch (galaError) {
+        console.log('[Wallet] Could not fetch GalaChain balances:', galaError);
+      }
+
       // Get native token balance first
       try {
         const nativeBalance = await state.provider.getBalance(state.address);
@@ -590,6 +624,8 @@ class WalletService {
       // Use default prices - should integrate with CoinGecko service
       const prices: Record<string, number> = {
         'ETH': 3500,
+        'WETH': 3500,
+        'GWETH': 3500,
         'BNB': 600,
         'MATIC': 0.8,
         'GALA': 0.01751,
