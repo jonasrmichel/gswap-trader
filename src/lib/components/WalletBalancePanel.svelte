@@ -48,10 +48,7 @@
           Refresh
         </button>
       </div>
-      <div class="flex items-center justify-between mt-1">
-        <div class="text-xs text-muted">
-          Network: <span class="text-foreground">{networkName}</span>
-        </div>
+      <div class="flex items-center justify-end mt-1">
         <div class="text-xs text-muted">
           {$walletStore.address?.slice(0, 6)}...{$walletStore.address?.slice(-4)}
         </div>
@@ -59,7 +56,7 @@
     </div>
 
     {#if hasBalances}
-      <div class="space-y-3">
+      <div class="space-y-3 overflow-y-auto" style="max-height: 280px;">
         <!-- GalaChain Balances Section -->
         {#if galaChainBalances.length > 0}
           <div>
@@ -92,13 +89,11 @@
         <!-- Other Network Balances -->
         {#if otherBalances.length > 0}
           <div>
-            {#if galaChainBalances.length > 0}
-              <div class="flex items-center gap-2 mb-2 mt-3">
-                <div class="w-2 h-2 bg-primary rounded-full"></div>
-                <span class="text-xs font-semibold text-primary uppercase tracking-wider">{networkName}</span>
-              </div>
-            {/if}
-            <div class="space-y-2 {galaChainBalances.length > 0 ? 'pl-4 border-l-2 border-primary/20' : ''}">
+            <div class="flex items-center gap-2 mb-2 {galaChainBalances.length > 0 ? 'mt-3' : ''}">
+              <div class="w-2 h-2 bg-accent rounded-full animate-pulse"></div>
+              <span class="text-xs font-semibold text-accent uppercase tracking-wider">{networkName}</span>
+            </div>
+            <div class="space-y-2 pl-4 border-l-2 border-accent/20">
               {#each otherBalances as balance}
                 <div class="flex items-center justify-between py-1">
                   <div class="flex items-center gap-2">

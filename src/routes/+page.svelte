@@ -8,7 +8,6 @@
   import TradingStats from '$lib/components/TradingStats.svelte';
   import TradingControls from '$lib/components/TradingControls.svelte';
   import PoolList from '$lib/components/PoolList.svelte';
-  import InitialBalance from '$lib/components/InitialBalance.svelte';
   import {
     tradingActive,
     tradingLogs,
@@ -184,10 +183,9 @@
     <!-- Trading Controls -->
     <TradingControls {agent} {logger} />
 
-    <!-- Initial Balance, Wallet Balance, and Trading Configuration -->
+    <!-- Wallet Balance and Trading Configuration -->
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-      <div class="lg:col-span-1 space-y-6">
-        <InitialBalance />
+      <div class="lg:col-span-1">
         <WalletBalancePanel />
       </div>
       <div class="lg:col-span-3">
