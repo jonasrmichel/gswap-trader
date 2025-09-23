@@ -14,7 +14,8 @@ export default defineConfig({
 		sveltekit()
 	],
 	server: {
-		port: 3000
+		port: 3000,
+		allowedHosts: ['gswap.ouchwowboing.io', 'localhost']
 	},
 	optimizeDeps: {
 		include: ['@gala-chain/gswap-sdk']

@@ -2,7 +2,8 @@
   import { onMount, onDestroy } from 'svelte';
   import { liquidityPools, selectedPool, tradingActive } from '$lib/stores/trading';
   import type { LiquidityPool } from '$lib/gswap/types';
-  import { GSwapSDKClient } from '$lib/gswap/gswap-sdk-client';
+  import { getGSwapClient, initializeGSwap } from '$lib/services/gswap';
+  import type { GSwapSDKClient } from '$lib/gswap/gswap-sdk-client';
 
   let searchQuery = '';
   let filteredPools: LiquidityPool[] = [];
@@ -44,30 +45,29 @@
     if (client) {
       isLoadingPrices = true;
       try {
+        console.log('[PoolList] Fetching pools from GSwap client...');
         const pools = await client.getPools();
+        console.log('[PoolList] Received pools:', pools);
         liquidityPools.set(pools);
         lastPriceUpdate = new Date();
       } catch (error) {
-        console.error('Failed to update pools:', error);
+        console.error('[PoolList] Failed to update pools:', error);
       } finally {
         isLoadingPrices = false;
       }
+    } else {
+      console.warn('[PoolList] No client available to fetch pools');
     }
   }
 
   onMount(async () => {
-    // Create GSwap SDK client instance
-    client = new GSwapSDKClient();
+    // Use shared GSwap SDK client instance
+    client = getGSwapClient();
+    
+    // Initialize GSwap with current wallet state
+    await initializeGSwap();
 
-    // Connect with private key if available for pool fetching
-    if (import.meta.env.VITE_WALLET_PRIVATE_KEY) {
-      try {
-        await client.connect(import.meta.env.VITE_WALLET_PRIVATE_KEY);
-      } catch (error) {
-        console.error('Failed to connect GSwap SDK for pool fetching:', error);
-      }
-    }
-
+    // Try to update pools
     await updatePools();
 
     // Update prices every 60 seconds

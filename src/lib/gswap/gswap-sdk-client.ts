@@ -163,17 +163,25 @@ export class GSwapSDKClient {
   }
 
   async getPools(): Promise<LiquidityPool[]> {
-    if (!this.gswap) {
-      throw new Error('GSwap not connected');
+    // Pools should be viewable even without wallet connection
+    console.log('[GSwapSDKClient] Getting pools...');
+    
+    // Get prices from CoinGecko with error handling
+    let galaPrice = 0.02;
+    let ethPrice = 3500;
+    
+    try {
+      const prices = await this.coinGecko.getPrices(['GALA', 'ethereum']);
+      galaPrice = prices.get('GALA')?.price || 0.02;
+      ethPrice = prices.get('ethereum')?.price || 3500;
+      console.log('[GSwapSDKClient] Got prices - GALA:', galaPrice, 'ETH:', ethPrice);
+    } catch (error) {
+      console.warn('[GSwapSDKClient] Failed to get prices, using defaults:', error);
     }
-
-    // Get prices from CoinGecko
-    const prices = await this.coinGecko.getPrices(['GALA', 'ethereum']);
-    const galaPrice = prices.get('GALA')?.price || 0.02;
-    const ethPrice = prices.get('ethereum')?.price || 3500;
 
     // GSwap SDK doesn't provide pool listing directly
     // Return hardcoded pools based on known GSwap pairs
+    // In the future, this could fetch from a GSwap API endpoint
     return [
       {
         id: 'GALA-GWETH',

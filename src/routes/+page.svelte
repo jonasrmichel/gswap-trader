@@ -21,7 +21,8 @@
     initialBalance
   } from '$lib/stores/trading';
   // GSwapClient removed - using GSwap SDK exclusively for GalaChain
-  import { GSwapSDKClient } from '$lib/gswap/gswap-sdk-client';
+  import type { GSwapSDKClient } from '$lib/gswap/gswap-sdk-client';
+  import { getGSwapClient, initializeGSwap } from '$lib/services/gswap';
   import { WalletManager } from '$lib/wallet/manager';
   import { TradingAgent } from '$lib/trading/agent';
   import { TradingLogger } from '$lib/trading/logger';
@@ -38,20 +39,12 @@
     // Initialize wallet service (will auto-connect if env key is set)
     await initializeWallet();
 
-    // Initialize GSwap SDK for GalaChain trading
-    console.log('Initializing GSwap SDK for GalaChain trading');
-    client = new GSwapSDKClient();
-
-    // Auto-connect with private key if provided
-    if (import.meta.env.VITE_WALLET_PRIVATE_KEY) {
-      try {
-        await client.connect(import.meta.env.VITE_WALLET_PRIVATE_KEY);
-        console.log('Connected to GSwap SDK with private key');
-        isWalletConnected.set(true);
-      } catch (error) {
-        console.error('Failed to connect to GSwap SDK:', error);
-      }
-    }
+    // Use shared GSwap SDK client for GalaChain trading
+    console.log('Getting shared GSwap SDK client for GalaChain trading');
+    client = getGSwapClient();
+    
+    // Initialize GSwap with current wallet state
+    await initializeGSwap();
 
     wallet = new WalletManager(client);
     logger = new TradingLogger();
@@ -151,6 +144,7 @@
     <div class="container mx-auto px-4 py-4">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-4">
+          <img src="/logo.png" alt="GSwap Trader" class="w-10 h-10 rounded-lg shadow-lg" />
           <h1 class="text-2xl font-bold bg-gradient-to-r from-accent to-purple-400 bg-clip-text text-transparent">
             GSwap Trader
           </h1>
