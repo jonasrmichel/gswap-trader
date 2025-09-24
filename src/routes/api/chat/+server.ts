@@ -1,8 +1,14 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
-const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
-const OPENAI_API_URL = import.meta.env.VITE_OPENAI_API_URL || 'https://api.openai.com/v1/chat/completions';
+// Try both VITE_ prefixed and non-prefixed env vars
+const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY || 
+                       process.env.VITE_OPENAI_API_KEY || 
+                       process.env.OPENAI_API_KEY;
+const OPENAI_API_URL = import.meta.env.VITE_OPENAI_API_URL || 
+                       process.env.VITE_OPENAI_API_URL ||
+                       process.env.OPENAI_API_URL ||
+                       'https://api.openai.com/v1/chat/completions';
 
 export const POST: RequestHandler = async ({ request }) => {
     try {
@@ -56,7 +62,7 @@ When discussing risk, emphasize capital preservation and the importance of prope
         if (!OPENAI_API_KEY) {
             // No API key configured
             return json({
-                content: '⚠️ OpenAI API is not configured. Please add your OpenAI API key to the .env file (VITE_OPENAI_API_KEY) to enable AI chat functionality.'
+                content: '⚠️ OpenAI API is not configured. Please add your OpenAI API key to the .env file (OPENAI_API_KEY or VITE_OPENAI_API_KEY) to enable AI chat functionality.'
             });
         }
 
