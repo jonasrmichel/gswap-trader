@@ -431,6 +431,14 @@ export class GSwapSDKClient {
       console.log('  - Fee Tier:', quote.feeTier || FEE_TIER.PERCENT_01_00);
 
       // Use the working format from test-trade.js
+      // Ensure fee is a valid FEE_TIER enum value (integer)
+      let fee = FEE_TIER.PERCENT_01_00; // Default to 1%
+      if (quote.feeTier !== undefined && typeof quote.feeTier === 'number' && Number.isInteger(quote.feeTier)) {
+        fee = quote.feeTier;
+      }
+      
+      console.log('  - Using fee value:', fee, '(type:', typeof fee, ')');
+      
       const swapResult = await this.gswap.swaps.swap({
         tokenIn: tokenIn,
         tokenOut: tokenOut,
@@ -438,7 +446,7 @@ export class GSwapSDKClient {
         amountOutMin: minAmountOut,
         recipient: recipient,
         deadline: Math.floor(Date.now() / 1000) + 300, // 5 minutes
-        fee: quote.feeTier || FEE_TIER.PERCENT_01_00 // Use fee from quote or default to 1%
+        fee: fee // Use validated fee value
       });
 
       console.log('✅ Swap submitted successfully!');
