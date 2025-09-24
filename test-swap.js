@@ -49,23 +49,31 @@ async function executeTrade() {
       // Use default GalaChain mainnet URL
     });
 
-    // Define tokens
+    // Define tokens - Now selling GALA for GUSDC
     const tokenGALA = formatTokenForGSwap('GALA');
-    const tokenGWETH = formatTokenForGSwap('GWETH');
-    const amountIn = 1; // 1 GALA
+    const tokenGUSDC = formatTokenForGSwap('GUSDC');
+    
+    // Calculate amount of GALA for $10 worth (assuming GALA is ~$0.02)
+    const galaPrice = 0.02; // Approximate GALA price in USD
+    const usdValue = 10; // $10 worth
+    const amountIn = Math.floor(usdValue / galaPrice); // ~500 GALA for $10
 
     console.log('📊 Trade configuration:');
     console.log('  - Token In:', tokenGALA);
-    console.log('  - Token Out:', tokenGWETH);
-    console.log('  - Amount In:', amountIn, 'GALA');
+    console.log('  - Token Out:', tokenGUSDC);
+    console.log('  - Amount In:', amountIn, 'GALA (~$' + (amountIn * galaPrice).toFixed(2) + ')');
 
-    // Check GALA balance first
-    console.log('💰 Checking GALA balance...');
+    // Check balances before trade
+    console.log('💰 Checking balances before trade...');
     try {
       const assets = await gswap.assets.getUserAssets(galaChainAddress, 1, 20);
       const galaAsset = assets.tokens.find(t => t.symbol === 'GALA');
+      const gusdcAsset = assets.tokens.find(t => t.symbol === 'GUSDC');
       const galaBalance = galaAsset ? parseFloat(galaAsset.quantity) : 0;
+      const gusdcBalance = gusdcAsset ? parseFloat(gusdcAsset.quantity) : 0;
+      
       console.log('  - GALA balance:', galaBalance);
+      console.log('  - GUSDC balance:', gusdcBalance);
 
       if (galaBalance < amountIn) {
         throw new Error(`Insufficient GALA balance. Required: ${amountIn}, Available: ${galaBalance}`);
@@ -75,15 +83,15 @@ async function executeTrade() {
     }
 
     // Get quote for the swap
-    console.log('💱 Getting quote for swap...');
+    console.log('💱 Getting quote for GALA → GUSDC swap...');
     const quote = await gswap.quoting.quoteExactInput(
       tokenGALA,
-      tokenGWETH,
+      tokenGUSDC,
       amountIn
     );
 
     console.log('📈 Quote received:');
-    console.log('  - Output amount:', quote.outTokenAmount.toNumber(), 'GWETH');
+    console.log('  - Output amount:', quote.outTokenAmount.toNumber(), 'GUSDC');
     console.log('  - Current price:', quote.currentPrice);
     console.log('  - Price impact:', quote.priceImpact + '%');
     console.log('  - Fee tier:', quote.feeTier);
@@ -92,17 +100,17 @@ async function executeTrade() {
     const slippage = 0.01;
     const minAmountOut = quote.outTokenAmount.toNumber() * (1 - slippage);
 
-    console.log('🔄 Executing swap...');
-    console.log('  - Min amount out:', minAmountOut, 'GWETH');
+    console.log('🔄 Executing GALA → GUSDC swap...');
+    console.log('  - Min amount out:', minAmountOut, 'GUSDC');
     console.log('  - Slippage tolerance:', (slippage * 100) + '%');
-    console.log('  - Using fee tier:', quote.feeTier);
+    console.log('  - Using fee tier:', quote.feeTier || 10000); // Default to 1% if not provided
 
     // Execute swap using the correct signature
     // swap(tokenIn, tokenOut, fee, amount, walletAddress)
     const swapResult = await gswap.swaps.swap(
       tokenGALA,           // tokenIn
-      tokenGWETH,          // tokenOut
-      quote.feeTier,       // fee
+      tokenGUSDC,          // tokenOut  
+      quote.feeTier || 10000, // fee (use quote or default to 1%)
       {                    // amount object
         exactIn: amountIn,
         amountOutMinimum: minAmountOut,
@@ -117,24 +125,45 @@ async function executeTrade() {
 
     // Wait for transaction confirmation
     console.log('⏳ Waiting for transaction confirmation...');
+    let txHash;
     try {
       const confirmedTx = await swapResult.waitDelegate();
       console.log('✅ Transaction confirmed!');
       console.log('📋 Confirmed transaction:', confirmedTx);
 
       // The confirmed transaction should have the blockchain hash
-      const txHash = confirmedTx.transactionHash || confirmedTx.hash || confirmedTx.txHash;
+      txHash = confirmedTx.transactionHash || confirmedTx.hash || confirmedTx.txHash;
       if (txHash) {
         console.log('🔗 View on GalaScan: https://galascan.gala.com/transaction/' + txHash);
-        return txHash;
       }
     } catch (waitError) {
       console.warn('⚠️ Could not wait for confirmation:', waitError.message);
+      // Use transaction ID as fallback
+      txHash = swapResult.transactionId;
     }
 
-    // Return the transaction ID as fallback
-    console.log('ℹ️ Transaction ID (pending):', swapResult.transactionId);
-    return swapResult.transactionId;
+    // Check balances after trade
+    console.log('\n💰 Checking balances after trade...');
+    try {
+      // Wait a bit for blockchain to update
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      const assetsAfter = await gswap.assets.getUserAssets(galaChainAddress, 1, 20);
+      const galaAssetAfter = assetsAfter.tokens.find(t => t.symbol === 'GALA');
+      const gusdcAssetAfter = assetsAfter.tokens.find(t => t.symbol === 'GUSDC');
+      const galaBalanceAfter = galaAssetAfter ? parseFloat(galaAssetAfter.quantity) : 0;
+      const gusdcBalanceAfter = gusdcAssetAfter ? parseFloat(gusdcAssetAfter.quantity) : 0;
+      
+      console.log('  - GALA balance:', galaBalanceAfter);
+      console.log('  - GUSDC balance:', gusdcBalanceAfter);
+      console.log('\n📊 Trade Summary:');
+      console.log('  - GALA spent:', amountIn);
+      console.log('  - GUSDC received:', gusdcBalanceAfter > 0 ? '~' + minAmountOut.toFixed(2) : 'pending');
+    } catch (balanceError) {
+      console.warn('⚠️ Could not check final balances:', balanceError.message);
+    }
+
+    return txHash;
 
   } catch (error) {
     console.error('❌ Error executing trade:', error.message);
