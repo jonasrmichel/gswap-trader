@@ -144,9 +144,20 @@ export class GSwapSDKClient {
   }
 
   async getUserAssets(walletAddress: string): Promise<any> {
-    if (!this.gswap) {
-      console.log('[GSwapSDKClient] GSwap not connected - cannot fetch assets');
-      return { tokens: [], count: 0 };
+    // For getUserAssets, we can fetch without being connected (read-only operation)
+    // Create a temporary GSwap instance if not connected
+    let gswapInstance = this.gswap;
+    
+    if (!gswapInstance) {
+      console.log('[GSwapSDKClient] Creating temporary GSwap instance for asset query');
+      // Create a read-only instance without signer
+      const tempAddress = walletAddress.startsWith('0x')
+        ? `eth|${walletAddress.slice(2).toLowerCase()}`
+        : walletAddress;
+        
+      gswapInstance = new GSwap({
+        walletAddress: tempAddress,
+      });
     }
 
     try {
@@ -156,12 +167,34 @@ export class GSwapSDKClient {
         : walletAddress;
 
       console.log('[GSwapSDKClient] Fetching assets for address:', galaChainAddress);
-      const result = await this.gswap.assets.getUserAssets(galaChainAddress, 1, 20);
+      const result = await gswapInstance.assets.getUserAssets(galaChainAddress, 1, 20);
       console.log('[GSwapSDKClient] Assets fetched:', result);
       
       // If no tokens, try fetching specific token balances
       if (!result.tokens || result.tokens.length === 0) {
-        console.log('[GSwapSDKClient] No tokens found, trying individual balance queries');
+        console.log('[GSwapSDKClient] No tokens found, trying alternative API');
+        
+        // Try the direct API endpoint
+        try {
+          const response = await fetch(`https://dex-backend-prod1.defi.gala.com/user/assets?address=${galaChainAddress}&page=1&limit=20`);
+          if (response.ok) {
+            const apiResult = await response.json();
+            if (apiResult.data && apiResult.data.token && apiResult.data.token.length > 0) {
+              console.log('[GSwapSDKClient] Assets found via API:', apiResult.data.token);
+              return {
+                tokens: apiResult.data.token.map((t: any) => ({
+                  symbol: t.symbol,
+                  quantity: t.quantity,
+                  decimals: t.decimals || 8
+                })),
+                count: apiResult.data.token.length
+              };
+            }
+          }
+        } catch (apiError) {
+          console.error('[GSwapSDKClient] API fallback failed:', apiError);
+        }
+        
         // Try to fetch individual balances for common tokens
         const commonTokens = ['GALA', 'GWETH', 'GUSDC', 'GUSDT'];
         const tokens = [];
@@ -187,6 +220,31 @@ export class GSwapSDKClient {
       return result;
     } catch (error) {
       console.error('[GSwapSDKClient] Failed to fetch user assets:', error);
+      
+      // Try direct API as last resort
+      try {
+        const galaChainAddress = walletAddress.startsWith('0x')
+          ? `eth|${walletAddress.slice(2).toLowerCase()}`
+          : walletAddress;
+          
+        const response = await fetch(`https://dex-backend-prod1.defi.gala.com/user/assets?address=${galaChainAddress}&page=1&limit=20`);
+        if (response.ok) {
+          const apiResult = await response.json();
+          if (apiResult.data && apiResult.data.token) {
+            return {
+              tokens: apiResult.data.token.map((t: any) => ({
+                symbol: t.symbol,
+                quantity: t.quantity,
+                decimals: t.decimals || 8
+              })),
+              count: apiResult.data.token.length
+            };
+          }
+        }
+      } catch (apiError) {
+        console.error('[GSwapSDKClient] API fallback also failed:', apiError);
+      }
+      
       // Return default tokens with 0 balance
       return { 
         tokens: [

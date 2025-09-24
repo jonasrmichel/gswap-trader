@@ -8,7 +8,8 @@ import { PaperTradingManager } from './paper-trading';
 import { LiveTradingStatsTracker } from './live-stats';
 import { getTradingParams, SIGNAL_THRESHOLDS } from './config';
 import { toast } from '../stores/toast';
-import { paperTradingStats, tradingStats, liveTradingStats } from '../stores/trading';
+import { paperTradingStats, tradingStats, liveTradingStats, initialBalance } from '../stores/trading';
+import { get } from 'svelte/store';
 
 export class TradingAgent {
   private client: GSwapSDKClient;
@@ -24,6 +25,8 @@ export class TradingAgent {
   private currentTrades: Map<string, Trade> = new Map();
   private selectedPool: LiquidityPool | null = null;
   private hasExecutedTestTrade = false;
+  private liveInitialBalance: number = 0;  // Track initial balance for live trading
+  private liveTotalSpent: number = 0;      // Track total amount spent in current session
 
   constructor(
     client: GSwapSDKClient,
@@ -109,11 +112,23 @@ export class TradingAgent {
           );
         }
 
-        // Initialize live trading stats with initial balances
-        this.liveStatsTracker.setInitialBalances(balances);
+        // Get the configured initial balance (trading limit)
+        const configuredInitialBalance = get(initialBalance);
+        
+        // Use the minimum of wallet balance and configured initial balance
+        const tradingLimit = Math.min(totalValue, configuredInitialBalance);
+        
+        // Initialize live trading stats with trading limit (not total wallet value)
+        this.liveStatsTracker.reset(tradingLimit); // Reset stats for new session with trading limit
+        this.liveStatsTracker.setInitialBalances(balances); // Store actual wallet balances for tracking
         liveTradingStats.set(this.liveStatsTracker.getStats());
-
+        
+        // Set the initial balance limit and reset spending counter
+        this.liveInitialBalance = tradingLimit;
+        this.liveTotalSpent = 0;
+        
         this.logger.logSystem(`Wallet balance verified: $${totalValue.toFixed(2)}`, 'success');
+        this.logger.logSystem(`Trading limit set to: $${this.liveInitialBalance.toFixed(2)} (configured: $${configuredInitialBalance}, wallet: $${totalValue.toFixed(2)})`, 'info');
       } catch (error: any) {
         this.logger.logError('Failed to verify wallet balance', error);
         toast.error(`Failed to verify wallet balance: ${error.message || 'Unknown error'}`);
@@ -171,6 +186,10 @@ export class TradingAgent {
     }
 
     this.isRunning = false;
+    
+    // Reset live trading counters
+    this.liveTotalSpent = 0;
+    
     this.logger.logSystem('Trading agent stopped');
   }
 
@@ -241,6 +260,38 @@ export class TradingAgent {
         if (tradeSize > maxTrade) {
           tradeSize = maxTrade;
           this.logger.logSystem(`Trade size limited to available balance: $${tradeSize.toFixed(2)}`, 'warning');
+        }
+      } else {
+        // For live trading, respect the initial balance limit
+        const remainingLimit = this.liveInitialBalance - this.liveTotalSpent;
+        
+        if (remainingLimit <= 0) {
+          this.logger.logSystem(
+            `Trading limit reached. Initial: $${this.liveInitialBalance.toFixed(2)}, Spent: $${this.liveTotalSpent.toFixed(2)}`,
+            'warning'
+          );
+          return;
+        }
+        
+        if (tradeSize > remainingLimit) {
+          tradeSize = remainingLimit;
+          this.logger.logSystem(
+            `Trade size limited to remaining balance: $${tradeSize.toFixed(2)} (Remaining: $${remainingLimit.toFixed(2)})`,
+            'warning'
+          );
+        }
+        
+        // Also check actual wallet balance
+        const walletBalances = await this.wallet.getBalances();
+        const totalWalletValue = walletBalances.reduce((sum, b) => sum + (b.value || 0), 0);
+        const maxWalletTrade = totalWalletValue * 0.9; // Keep 10% reserve
+        
+        if (tradeSize > maxWalletTrade) {
+          tradeSize = maxWalletTrade;
+          this.logger.logSystem(
+            `Trade size limited to wallet balance: $${tradeSize.toFixed(2)}`,
+            'warning'
+          );
         }
       }
 
@@ -329,6 +380,23 @@ export class TradingAgent {
           return;
         }
       } else {
+        // For live trading, check against session limit first
+        const remainingLimit = this.liveInitialBalance - this.liveTotalSpent;
+        if (remainingLimit <= 0.01) { // Less than 1 cent remaining
+          this.logger.logSystem(`Trading limit reached for this session. Spent: $${this.liveTotalSpent.toFixed(2)} / $${this.liveInitialBalance.toFixed(2)}`, 'warning');
+          return;
+        }
+        
+        // Cap the trade amount to remaining limit
+        const tokenPrice = signal.action === 'buy' ? (pool.priceTokenB || 1) : (pool.priceTokenA || 1);
+        const tradeValue = parseFloat(amountIn) * tokenPrice;
+        
+        if (tradeValue > remainingLimit) {
+          const cappedAmount = remainingLimit / tokenPrice;
+          this.logger.logSystem(`Trade amount capped to remaining limit: ${cappedAmount.toFixed(6)} ${tokenIn} ($${remainingLimit.toFixed(2)})`, 'info');
+          amountIn = cappedAmount.toString();
+        }
+        
         // Check live wallet balance
         const balances = await this.wallet.getBalances();
         
@@ -441,6 +509,15 @@ export class TradingAgent {
           // Update live trading stats
           this.liveStatsTracker.addTrade(trade);
           liveTradingStats.set(this.liveStatsTracker.getStats());
+
+          // Update spent amount for live trading limits
+          // Determine the price of the input token
+          const inputTokenPrice = trade.tokenIn === pool.tokenA.symbol 
+            ? (pool.priceTokenA || pool.tokenA.price || 1)
+            : (pool.priceTokenB || pool.tokenB.price || 1);
+          const tradeValueIn = parseFloat(trade.amountIn) * inputTokenPrice;
+          this.liveTotalSpent += tradeValueIn;
+          this.logger.logSystem(`Total spent this session: $${this.liveTotalSpent.toFixed(2)} / $${this.liveInitialBalance.toFixed(2)}`, 'info');
 
           this.logger.logSystem(`Live trade executed on GalaChain: ${txHash}`, 'success');
           this.logger.logSystem(`View on GalaScan: https://galascan.gala.com/transaction/${txHash}`, 'info');

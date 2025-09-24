@@ -28,6 +28,8 @@ export class LiveTradingStatsTracker {
   private startTime: Date;
   private initialBalances: Map<string, number> = new Map();
   private currentBalances: Map<string, number> = new Map();
+  private sessionInitialValue: number = 0; // Initial wallet value when session started
+  private sessionStarted: boolean = false;
 
   constructor(initialBalance: number = 0) {
     this.startTime = new Date();
@@ -69,25 +71,42 @@ export class LiveTradingStatsTracker {
       totalValue += b.value || 0;
     }
     
-    this.stats.initialBalance = totalValue;
-    this.stats.currentBalance = totalValue;
-    this.stats.totalValue = totalValue;
+    // Store the actual wallet value at session start
+    this.sessionInitialValue = totalValue;
+    this.sessionStarted = true;
+    
+    // initialBalance for stats is the trading limit (not wallet total)
+    // Keep the initialBalance as set by reset() - that's the trading limit
+    // currentBalance and totalValue start at the trading limit, not wallet total
+    this.stats.currentBalance = this.stats.initialBalance; // Use trading limit
+    this.stats.totalValue = this.stats.initialBalance; // Use trading limit
     this.stats.lastUpdate = new Date();
   }
 
   updateCurrentBalances(balances: Array<{token: string, balance: string, value: number}>) {
+    if (!this.sessionStarted) {
+      // Session not started yet, don't update
+      return;
+    }
+    
     this.currentBalances.clear();
-    let totalValue = 0;
+    let currentWalletValue = 0;
     
     for (const b of balances) {
       const amount = parseFloat(b.balance);
       this.currentBalances.set(b.token, amount);
-      totalValue += b.value || 0;
+      currentWalletValue += b.value || 0;
     }
     
-    this.stats.currentBalance = totalValue;
-    this.stats.totalValue = totalValue;
-    this.stats.profitLoss = totalValue - this.stats.initialBalance;
+    // Calculate the change in wallet value since session start
+    const walletValueChange = currentWalletValue - this.sessionInitialValue;
+    
+    // Current balance for the session is initial trading limit + wallet value change
+    this.stats.currentBalance = this.stats.initialBalance + walletValueChange;
+    this.stats.totalValue = this.stats.initialBalance + walletValueChange;
+    
+    // P&L is based on the trading limit, not total wallet
+    this.stats.profitLoss = walletValueChange; // Just the change during this session
     this.stats.profitLossPercent = this.stats.initialBalance > 0 
       ? (this.stats.profitLoss / this.stats.initialBalance) * 100 
       : 0;
@@ -163,6 +182,8 @@ export class LiveTradingStatsTracker {
     this.initialBalances.clear();
     this.currentBalances.clear();
     this.startTime = new Date();
+    this.sessionInitialValue = 0;
+    this.sessionStarted = false;
     this.stats = this.createEmptyStats(initialBalance);
   }
 

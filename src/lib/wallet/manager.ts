@@ -112,6 +112,54 @@ export class WalletManager {
       throw new Error('Wallet not connected');
     }
 
+    // For private key connection, always fetch fresh balances from GalaChain
+    if (this.config?.type === 'private-key') {
+      console.log('[WalletManager] Private key mode - fetching fresh GalaChain balances');
+      const walletAddress = this.getAddress();
+      if (!walletAddress) {
+        console.error('No wallet address available for balance check');
+        return [];
+      }
+
+      try {
+        // Use GSwap SDK's getUserAssets to fetch all balances at once
+        const assets = await this.client.getUserAssets(walletAddress);
+        console.log('[WalletManager] GalaChain assets fetched:', assets);
+
+        // Map the assets to our wallet balance format
+        const balances: WalletBalance[] = assets.tokens.map((token: any) => {
+          // Get approximate USD values (in production, use real price API)
+          const prices: Record<string, number> = {
+            'GALA': 0.02,
+            'GWETH': 3500,
+            'GUSDC': 1,
+            'GUSDT': 1
+          };
+
+          const price = prices[token.symbol] || 0;
+          const quantity = parseFloat(token.quantity || '0');
+
+          return {
+            token: token.symbol,
+            balance: token.quantity,
+            value: quantity * price
+          };
+        });
+
+        console.log('[WalletManager] Returning GalaChain balances:', balances);
+        return balances;
+      } catch (error) {
+        console.error('Failed to fetch GalaChain balances:', error);
+        // Return empty balances for common tokens if API fails
+        return [
+          { token: 'GALA', balance: '0', value: 0 },
+          { token: 'GWETH', balance: '0', value: 0 },
+          { token: 'GUSDC', balance: '0', value: 0 },
+          { token: 'GUSDT', balance: '0', value: 0 }
+        ];
+      }
+    }
+
     // Use balances from wallet store if available and not demo
     if (this.walletState?.balances && this.walletState.balances.length > 0 && this.config?.type !== 'demo') {
       console.log('[WalletManager] Using balances from wallet store:', this.walletState.balances);
