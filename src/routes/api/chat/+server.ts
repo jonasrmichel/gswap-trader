@@ -2,11 +2,15 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
-const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
+const OPENAI_API_URL = import.meta.env.VITE_OPENAI_API_URL || 'https://api.openai.com/v1/chat/completions';
 
 export const POST: RequestHandler = async ({ request }) => {
     try {
         const { messages, message } = await request.json();
+        
+        // Debug log
+        console.log('[Chat API] API Key configured:', !!OPENAI_API_KEY);
+        console.log('[Chat API] API URL:', OPENAI_API_URL);
 
         // Build conversation history for OpenAI
         const conversationHistory = messages

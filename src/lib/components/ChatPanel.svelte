@@ -429,7 +429,7 @@
             <div class="flex items-center gap-2">
                 <div class="w-2 h-2 bg-success rounded-full animate-pulse"></div>
                 <h3 class="text-lg font-semibold text-accent">AI Assistant</h3>
-                <span class="text-xs text-muted">GPT-4 Turbo</span>
+                <span class="text-xs text-muted">GPT-4</span>
             </div>
             <button
                 on:click={() => showCommands = !showCommands}
