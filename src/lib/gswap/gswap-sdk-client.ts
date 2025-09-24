@@ -431,23 +431,39 @@ export class GSwapSDKClient {
       console.log('  - Fee Tier:', quote.feeTier || FEE_TIER.PERCENT_01_00);
 
       // Use the working format from test-trade.js
-      // Ensure fee is a valid FEE_TIER enum value (integer)
-      let fee = FEE_TIER.PERCENT_01_00; // Default to 1%
-      if (quote.feeTier !== undefined && typeof quote.feeTier === 'number' && Number.isInteger(quote.feeTier)) {
-        fee = quote.feeTier;
+      // The fee must be one of the valid FEE_TIER enum values: 500, 3000, or 10000
+      let fee = 10000; // Default to 1% (PERCENT_01_00 = 10000)
+      
+      // Check if quote has a valid fee tier
+      if (quote.feeTier !== undefined) {
+        console.log('  - Quote fee tier:', quote.feeTier, 'type:', typeof quote.feeTier);
+        // Validate it's one of the allowed values
+        if (quote.feeTier === 500 || quote.feeTier === 3000 || quote.feeTier === 10000) {
+          fee = quote.feeTier;
+        } else if (quote.feeTier === FEE_TIER.PERCENT_00_05 || 
+                   quote.feeTier === FEE_TIER.PERCENT_00_30 || 
+                   quote.feeTier === FEE_TIER.PERCENT_01_00) {
+          fee = quote.feeTier;
+        } else {
+          console.warn('Invalid fee tier from quote:', quote.feeTier, '- using default 10000 (1%)');
+        }
       }
       
-      console.log('  - Using fee value:', fee, '(type:', typeof fee, ')');
+      console.log('  - Using fee value:', fee, '(type:', typeof fee, ', isInteger:', Number.isInteger(fee), ')');
       
-      const swapResult = await this.gswap.swaps.swap({
-        tokenIn: tokenIn,
-        tokenOut: tokenOut,
-        amountIn: amountIn,
-        amountOutMin: minAmountOut,
-        recipient: recipient,
-        deadline: Math.floor(Date.now() / 1000) + 300, // 5 minutes
-        fee: fee // Use validated fee value
-      });
+      // Use the CORRECT signature from test-swap.js
+      // swap(tokenIn, tokenOut, fee, amount, walletAddress)
+      const swapResult = await this.gswap.swaps.swap(
+        tokenIn,           // tokenIn
+        tokenOut,          // tokenOut
+        fee,               // fee (500, 3000, or 10000)
+        {                  // amount object
+          exactIn: amountIn,
+          amountOutMinimum: minAmountOut,
+          deadline: Math.floor(Date.now() / 1000) + 300
+        },
+        recipient          // walletAddress (GalaChain format)
+      );
 
       console.log('✅ Swap submitted successfully!');
       console.log('📋 Swap result:', swapResult);
