@@ -552,8 +552,9 @@ export class TradingAgent {
           this.liveTotalSpent += tradeValueIn;
           this.logger.logSystem(`Total spent this session: $${this.liveTotalSpent.toFixed(2)} / $${this.liveInitialBalance.toFixed(2)}`, 'info');
 
-          this.logger.logSystem(`Live trade executed on GalaChain: ${txHash}`, 'success');
-          this.logger.logSystem(`View on GalaScan: https://galascan.gala.com/transaction/${txHash}`, 'info');
+          this.logger.logSystem(`✅ Live trade submitted to GalaChain!`, 'success');
+          this.logger.logSystem(`Transaction ID: ${txHash}`, 'info');
+          this.logger.logSystem(`Status: Processing on blockchain (~5-10 seconds)`, 'info');
         } catch (swapError: any) {
           trade.status = 'failed';
           this.logger.logError(`Failed to execute swap: ${swapError.message}`, swapError);

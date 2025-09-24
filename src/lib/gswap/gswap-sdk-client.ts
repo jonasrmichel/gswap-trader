@@ -508,8 +508,10 @@ export class GSwapSDKClient {
         // For now, return the transaction ID
         // In production, you'd want to set up socket connection or poll for status
         console.log('✅ Trade submitted to GalaChain successfully');
-        console.log('ℹ️ Transaction ID (pending blockchain confirmation):', txId);
-        console.log('📌 Note: Transaction is real and will be processed on GalaChain');
+        console.log('ℹ️ Transaction ID:', txId);
+        console.log('📌 Transaction Status: PENDING (processing on blockchain)');
+        console.log('⏱️ Confirmation: ~5-10 seconds for blockchain processing');
+        console.log('💡 Tip: Run "node check-balances.js" to verify trade completion');
         
         // The transaction IS real and WILL execute on the blockchain
         // We just can't track it in real-time without socket connection
