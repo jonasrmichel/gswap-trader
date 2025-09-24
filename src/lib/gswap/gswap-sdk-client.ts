@@ -35,6 +35,7 @@ export class GSwapSDKClient {
   private coinGecko: CoinGeckoService;
   private connected: boolean = false;
   private address: string | null = null;
+  private galaChainAddress: string | null = null;
 
   constructor() {
     this.coinGecko = new CoinGeckoService();
@@ -61,12 +62,16 @@ export class GSwapSDKClient {
       // Derive address from private key
       const wallet = new ethers.Wallet(privateKey);
       this.address = wallet.address;
-      const galaChainAddress = `eth|${this.address.slice(2)}`;
+      this.galaChainAddress = `eth|${this.address.slice(2).toLowerCase()}`;
+
+      console.log('[GSwapSDKClient] Connecting with addresses:');
+      console.log('  - Ethereum address:', this.address);
+      console.log('  - GalaChain address:', this.galaChainAddress);
 
       // Create GSwap instance with wallet address
       this.gswap = new GSwap({
         signer: this.signer,
-        walletAddress: galaChainAddress,
+        walletAddress: this.galaChainAddress,
       });
 
       this.connected = true;
@@ -84,6 +89,7 @@ export class GSwapSDKClient {
       this.gswap = null;
       this.connected = false;
       this.address = null;
+      this.galaChainAddress = null;
       return;
     }
 
@@ -93,17 +99,21 @@ export class GSwapSDKClient {
 
       // Get address from signer
       this.address = await ethersSigner.getAddress();
-      const galaChainAddress = `eth|${this.address.slice(2)}`;
+      this.galaChainAddress = `eth|${this.address.slice(2).toLowerCase()}`;
+
+      console.log('[GSwapSDKClient] MetaMask connection:');
+      console.log('  - Ethereum address:', this.address);
+      console.log('  - GalaChain address:', this.galaChainAddress);
 
       // Create GSwap instance with MetaMask signer and GalaChain formatted address
       this.gswap = new GSwap({
         signer: this.signer,
-        walletAddress: galaChainAddress,
+        walletAddress: this.galaChainAddress,
       });
 
       this.connected = true;
 
-      console.log('Connected to GSwap SDK with MetaMask signer, address:', galaChainAddress);
+      console.log('Connected to GSwap SDK with MetaMask signer');
     } catch (error) {
       console.error('Failed to connect GSwap with MetaMask:', error);
       throw error;
@@ -420,13 +430,17 @@ export class GSwapSDKClient {
       // Calculate minimum output with slippage
       const minAmountOut = quote.outTokenAmount.toNumber() * (1 - (params.slippage || 0.01));
 
-      // Execute swap - use GalaChain format for recipient address
-      const recipient = this.address ? `eth|${this.address.slice(2)}` : undefined;
+      // Use the stored GalaChain address - MUST match the one used in GSwap initialization
+      const recipient = this.galaChainAddress;
+      
+      if (!recipient) {
+        throw new Error('GalaChain address not set - wallet not properly connected');
+      }
       
       console.log('🔄 Executing REAL swap on GalaChain...');
       console.log('  - Amount In:', amountIn, params.tokenIn);
       console.log('  - Min Amount Out:', minAmountOut, params.tokenOut);
-      console.log('  - Recipient:', recipient);
+      console.log('  - Recipient (GalaChain):', recipient);
       console.log('  - Slippage:', (params.slippage || 0.01) * 100 + '%');
       console.log('  - Fee Tier:', quote.feeTier || FEE_TIER.PERCENT_01_00);
 
