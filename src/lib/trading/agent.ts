@@ -8,7 +8,7 @@ import { PaperTradingManager } from './paper-trading';
 import { LiveTradingStatsTracker } from './live-stats';
 import { getTradingParams, SIGNAL_THRESHOLDS } from './config';
 import { toast } from '../stores/toast';
-import { paperTradingStats, tradingStats } from '../stores/trading';
+import { paperTradingStats, tradingStats, liveTradingStats } from '../stores/trading';
 
 export class TradingAgent {
   private client: GSwapSDKClient;
@@ -109,6 +109,10 @@ export class TradingAgent {
           );
         }
 
+        // Initialize live trading stats with initial balances
+        this.liveStatsTracker.setInitialBalances(balances);
+        liveTradingStats.set(this.liveStatsTracker.getStats());
+
         this.logger.logSystem(`Wallet balance verified: $${totalValue.toFixed(2)}`, 'success');
       } catch (error: any) {
         this.logger.logError('Failed to verify wallet balance', error);
@@ -134,6 +138,19 @@ export class TradingAgent {
       this.executeTradingCycle();
     }, params.checkInterval);
 
+    // Start stats update loop for live trading (every 30 seconds)
+    if (!this.config.paperTrading) {
+      this.statsUpdateInterval = setInterval(async () => {
+        try {
+          const balances = await this.wallet.getBalances();
+          this.liveStatsTracker.updateCurrentBalances(balances);
+          liveTradingStats.set(this.liveStatsTracker.getStats());
+        } catch (error) {
+          console.error('Failed to update live trading stats:', error);
+        }
+      }, 30000); // Update every 30 seconds
+    }
+
     // Execute immediately
     this.executeTradingCycle();
   }
@@ -146,6 +163,11 @@ export class TradingAgent {
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = undefined;
+    }
+    
+    if (this.statsUpdateInterval) {
+      clearInterval(this.statsUpdateInterval);
+      this.statsUpdateInterval = undefined;
     }
 
     this.isRunning = false;
@@ -415,6 +437,10 @@ export class TradingAgent {
           trade.txHash = txHash;
           trade.status = 'success';
           trade.profit = this.calculateProfit(trade, pool);
+          
+          // Update live trading stats
+          this.liveStatsTracker.addTrade(trade);
+          liveTradingStats.set(this.liveStatsTracker.getStats());
 
           this.logger.logSystem(`Live trade executed on GalaChain: ${txHash}`, 'success');
           this.logger.logSystem(`View on GalaScan: https://galascan.gala.com/transaction/${txHash}`, 'info');

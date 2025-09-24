@@ -49,3 +49,24 @@ export const paperTradingStats = writable({
   avgProfit: 0,
   avgLoss: 0,
 });
+
+// Live trading stats
+export const liveTradingStats = writable({
+  initialBalance: 0,
+  currentBalance: 0,
+  totalValue: 0,
+  profitLoss: 0,
+  profitLossPercent: 0,
+  totalTrades: 0,
+  successfulTrades: 0,
+  failedTrades: 0,
+  winRate: 0,
+  totalVolume: 0,
+  fees: 0,
+  avgTradeSize: 0,
+  avgProfit: 0,
+  avgLoss: 0,
+  winningTrades: 0,
+  losingTrades: 0,
+  lastUpdate: new Date(),
+});
