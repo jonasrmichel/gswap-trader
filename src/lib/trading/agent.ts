@@ -476,7 +476,7 @@ export class TradingAgent {
         return;
       }
 
-      // Create trade record
+      // Create trade record with price information
       const trade: Trade = {
         id: this.generateTradeId(),
         timestamp: new Date(),
@@ -485,6 +485,9 @@ export class TradingAgent {
         tokenOut,
         amountIn,
         amountOut,
+        priceIn: tokenIn === pool.tokenA.symbol ? pool.priceTokenA : pool.priceTokenB,
+        priceOut: tokenOut === pool.tokenA.symbol ? pool.priceTokenA : pool.priceTokenB,
+        fee: parseFloat(amountIn) * 0.01, // Assume 1% fee for now
         status: 'pending',
       };
 

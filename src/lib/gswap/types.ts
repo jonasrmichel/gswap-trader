@@ -57,6 +57,9 @@ export interface Trade {
   tokenOut: string;
   amountIn: string;
   amountOut: string;
+  priceIn?: number;  // Price of input token in USD
+  priceOut?: number; // Price of output token in USD
+  fee?: number;      // Transaction fee
   profit?: number;
   txHash?: string;
   status: 'pending' | 'success' | 'failed';
