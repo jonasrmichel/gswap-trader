@@ -325,6 +325,32 @@ export class TradingAgent {
         console.log('[TradingAgent] All wallet balances:', balances);
         const tokenBalance = balances.find(b => b.token === tokenIn || b.token === `${tokenIn} (GalaChain)`);
         availableTokenBalance = parseFloat(tokenBalance?.balance || '0');
+        
+        // If we don't have the input token, check if we have the output token and can reverse the trade
+        if (availableTokenBalance === 0) {
+          const oppositeToken = signal.action === 'buy' ? pool.tokenA.symbol : pool.tokenB.symbol;
+          const oppositeBalance = balances.find(b => b.token === oppositeToken || b.token === `${oppositeToken} (GalaChain)`);
+          const oppositeAvailable = parseFloat(oppositeBalance?.balance || '0');
+          
+          if (oppositeAvailable > 0) {
+            // Reverse the trade direction
+            this.logger.logSystem(`No ${tokenIn} available, but have ${oppositeAvailable} ${oppositeToken}. Reversing trade direction.`, 'info');
+            signal.action = signal.action === 'buy' ? 'sell' : 'buy';
+            
+            // Recalculate tokens
+            if (signal.action === 'buy') {
+              tokenIn = pool.tokenB.symbol;
+              tokenOut = pool.tokenA.symbol;
+            } else {
+              tokenIn = pool.tokenA.symbol;
+              tokenOut = pool.tokenB.symbol;
+            }
+            
+            // Update available balance
+            availableTokenBalance = oppositeAvailable;
+          }
+        }
+        
         this.logger.logSystem(`[Live Trading] ${tokenIn} balance: ${availableTokenBalance} (from wallet)`, 'info');
         
         // Log all balances for debugging
@@ -402,6 +428,10 @@ export class TradingAgent {
         
         // Debug: log all balances
         console.log('[TradingAgent] All wallet balances:', balances);
+        console.log('[TradingAgent] Wallet balance count:', balances.length);
+        balances.forEach(b => {
+          console.log(`[TradingAgent]   - ${b.token}: ${b.balance} (value: $${b.value})`);
+        });
         
         // Find the balance - check both exact match and with (GalaChain) suffix
         const tokenInBalance = balances.find(b => 
