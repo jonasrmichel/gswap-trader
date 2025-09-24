@@ -323,76 +323,113 @@ export class GSwapSDKClient {
     }
 
     try {
-      console.log('Executing GSwap SDK swap:', params);
+      console.log('🚀 Starting real GSwap transaction');
+      console.log('📊 Swap parameters:', params);
+
+      // Verify we have a signer
+      if (!this.signer) {
+        throw new Error('No signer available - wallet not connected properly');
+      }
 
       // Convert token symbols to GSwap format
       const tokenIn = formatTokenForGSwap(params.tokenIn);
       const tokenOut = formatTokenForGSwap(params.tokenOut);
       const amountIn = parseFloat(params.amountIn);
 
-      console.log('GSwap formatted tokens:', {
+      console.log('🔄 GSwap formatted tokens:', {
         tokenIn,
         tokenOut,
-        amountIn
+        amountIn,
+        walletAddress: this.address
       });
 
       // Get quote first
+      console.log('💱 Getting quote from GSwap...');
       const quote = await this.gswap.quoting.quoteExactInput(
         tokenIn,
         tokenOut,
         amountIn
       );
 
-      console.log('GSwap quote:', {
+      console.log('📈 Quote received:', {
         outAmount: quote.outTokenAmount.toNumber(),
         price: quote.currentPrice,
         priceImpact: quote.priceImpact,
         feeTier: quote.feeTier,
         fee: quote.fee
       });
-      console.log('Full quote object:', quote);
 
       // Calculate minimum output with slippage
       const minAmountOut = quote.outTokenAmount.toNumber() * (1 - (params.slippage || 0.01));
 
       // Execute swap - use GalaChain format for recipient address
-      console.log('Executing swap with GSwap SDK...');
       const recipient = this.address ? `eth|${this.address.slice(2)}` : undefined;
-      console.log('Recipient address:', recipient);
+      
+      console.log('🔄 Executing REAL swap on GalaChain...');
+      console.log('  - Amount In:', amountIn, params.tokenIn);
+      console.log('  - Min Amount Out:', minAmountOut, params.tokenOut);
+      console.log('  - Recipient:', recipient);
+      console.log('  - Slippage:', (params.slippage || 0.01) * 100 + '%');
+      console.log('  - Fee Tier:', quote.feeTier || FEE_TIER.PERCENT_01_00);
 
-      // Execute swap using the correct signature
-      // swap(tokenIn, tokenOut, fee, amount, walletAddress)
-      const swapResult = await this.gswap.swaps.swap(
-        tokenIn,              // tokenIn
-        tokenOut,             // tokenOut
-        quote.feeTier,        // fee (use the fee tier from the quote)
-        {                     // amount object
-          exactIn: amountIn,
-          amountOutMinimum: minAmountOut,
-          deadline: Math.floor(Date.now() / 1000) + 300
-        },
-        recipient             // walletAddress (GalaChain formatted)
-      );
+      // Use the working format from test-trade.js
+      const swapResult = await this.gswap.swaps.swap({
+        tokenIn: tokenIn,
+        tokenOut: tokenOut,
+        amountIn: amountIn,
+        amountOutMin: minAmountOut,
+        recipient: recipient,
+        deadline: Math.floor(Date.now() / 1000) + 300, // 5 minutes
+        fee: quote.feeTier || FEE_TIER.PERCENT_01_00 // Use fee from quote or default to 1%
+      });
 
-      console.log('Swap result:', swapResult);
+      console.log('✅ Swap submitted successfully!');
+      console.log('📋 Swap result:', swapResult);
+      console.log('⏳ Waiting for blockchain confirmation...');
 
-      // Return transaction ID
+      // The swap returns a PendingTransaction that we need to wait for
       if (swapResult && typeof swapResult === 'object') {
-        // For PendingTransaction, we get a transactionId that's not the final blockchain hash
-        // This is an internal GalaChain ID that can't be looked up on GalaScan
-        const txId = (swapResult as any).transactionId;
-        if (txId) {
-          console.log('Transaction submitted with ID:', txId);
-          // Note: To get the actual blockchain hash, we'd need to wait for confirmation
-          // but that requires a socket connection which is not set up in this context
-          return txId;
+        try {
+          // Wait for transaction confirmation to get the real blockchain hash
+          const confirmedTx = await (swapResult as any).waitDelegate();
+          console.log('Transaction confirmed:', confirmedTx);
+          
+          // Extract the blockchain transaction hash
+          const txHash = confirmedTx?.transactionHash || 
+                        confirmedTx?.hash || 
+                        confirmedTx?.txHash ||
+                        confirmedTx?.id;
+                        
+          if (txHash) {
+            console.log('✅ Real blockchain transaction hash:', txHash);
+            console.log('🔗 View on GalaScan: https://galascan.gala.com/transaction/' + txHash);
+            return txHash;
+          }
+          
+          // If we can't get the hash from confirmed tx, use transaction ID
+          const txId = (swapResult as any).transactionId;
+          if (txId) {
+            console.log('⚠️ Using transaction ID (not blockchain hash):', txId);
+            return txId;
+          }
+        } catch (waitError) {
+          console.warn('Could not wait for confirmation, using transaction ID:', waitError);
+          
+          // Fall back to transaction ID if waiting fails
+          const txId = (swapResult as any).transactionId;
+          if (txId) {
+            console.log('Using transaction ID:', txId);
+            return txId;
+          }
         }
       }
 
-      // Fallback
+      // Fallback - should never reach here
       const timestamp = Date.now().toString(16);
       const random = Math.random().toString(16).substring(2, 10);
-      return `pending-${timestamp}-${random}`;
+      const fallbackId = `pending-${timestamp}-${random}`;
+      console.warn('⚠️ Using fallback transaction ID:', fallbackId);
+      return fallbackId;
     } catch (error: any) {
       console.error('GSwap SDK execution error:', error);
       throw new Error(`GSwap execution failed: ${error.message}`);
