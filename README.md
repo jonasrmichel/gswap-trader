@@ -73,7 +73,7 @@ GSwap Trader is an intelligent automated trading agent for the GSwap decentraliz
 
 ### Prerequisites
 - Node.js 18+ and npm
-- MetaMask browser extension
+- MetaMask browser extension (or private key for automatic trading)
 - Some crypto for trading (or use paper trading mode)
 
 ### Installation
@@ -86,9 +86,30 @@ cd gswap-trader
 # Install dependencies
 npm install
 
+# Copy environment variables
+cp .env.example .env
+
 # Start the development server
 npm run dev
 ```
+
+### 🤖 Automatic Trading Setup (No Wallet Approval Needed)
+
+To enable fully automatic trading without MetaMask approval prompts:
+
+1. **Create a dedicated trading wallet** (for security)
+2. **Export the private key** from your wallet
+3. **Add to `.env` file:**
+   ```bash
+   VITE_WALLET_PRIVATE_KEY=your_private_key_here
+   ```
+4. **Restart the app** - it will auto-connect using the private key
+
+⚠️ **Security Notes:**
+- Never share your private key
+- Use a separate wallet for trading with limited funds
+- The `.env` file is gitignored for safety
+- Consider using a hardware wallet for large amounts
 
 The app will be available at `http://localhost:4000`
 
