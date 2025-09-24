@@ -404,11 +404,15 @@ class WalletService {
                 // Price not available
               }
 
+              // Don't add (GalaChain) suffix - just use the token symbol as-is
+              // The tokens from GalaChain already have the G prefix (GUSDC, GWETH, etc)
               balances.push({
-                token: `${token.symbol} (GalaChain)`,
+                token: token.symbol,
                 balance: token.quantity,
                 value: value
               });
+              
+              console.log(`[Wallet] Added GalaChain token: ${token.symbol} balance: ${token.quantity}`);
             }
           }
         }
@@ -631,7 +635,9 @@ class WalletService {
         'MATIC': 0.8,
         'GALA': 0.01751,
         'USDC': 1,
+        'GUSDC': 1,  // GalaChain USDC
         'USDT': 1,
+        'GUSDT': 1,  // GalaChain USDT
       };
       return prices[symbol] || 0;
     } catch {

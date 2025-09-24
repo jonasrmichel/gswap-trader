@@ -159,7 +159,9 @@
       "Bash(git branch:*)",
       "Bash(npm run test-swap:*)",
       "Bash(node:*)",
-      "Bash(npm run test-trade:*)"
+      "Bash(npm run test-trade:*)",
+      "Bash(gh repo edit:*)",
+      "Bash(dig:*)"
     ],
     "deny": [],
     "ask": [],

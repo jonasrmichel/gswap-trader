@@ -114,12 +114,34 @@ export class WalletManager {
 
     // Use balances from wallet store if available and not demo
     if (this.walletState?.balances && this.walletState.balances.length > 0 && this.config?.type !== 'demo') {
+      console.log('[WalletManager] Using balances from wallet store:', this.walletState.balances);
       // Convert wallet store balances to our format
-      return this.walletState.balances.map(b => ({
-        token: b.token,
-        balance: b.balance,
-        value: b.value || 0
-      }));
+      // Handle both formats: "GUSDC (GalaChain)" and "GUSDC"
+      const processedBalances = this.walletState.balances.map(b => {
+        // Extract the base token name - remove any (GalaChain) suffix
+        let tokenName = b.token.replace(' (GalaChain)', '').replace('(GalaChain)', '');
+        
+        // GalaChain tokens already have the G prefix, so don't add it again
+        // Only convert standard tokens to GalaChain format if needed
+        if (tokenName === 'USDC') {
+          tokenName = 'GUSDC';
+        } else if (tokenName === 'ETH' || tokenName === 'WETH') {
+          tokenName = 'GWETH';
+        } else if (tokenName === 'USDT') {
+          tokenName = 'GUSDT';
+        }
+        // If it already starts with G (like GUSDC, GWETH), keep it as is
+        
+        console.log(`[WalletManager] Processed balance: ${b.token} -> ${tokenName}: ${b.balance}`);
+        
+        return {
+          token: tokenName,
+          balance: b.balance,
+          value: b.value || 0
+        };
+      });
+      
+      return processedBalances;
     }
 
     if (this.config?.type === 'demo') {

@@ -5,9 +5,10 @@ import type { LiquidityPool, Trade } from '../gswap/types';
 import { TradingStrategy } from './strategies';
 import { TradingLogger } from './logger';
 import { PaperTradingManager } from './paper-trading';
+import { LiveTradingStatsTracker } from './live-stats';
 import { getTradingParams, SIGNAL_THRESHOLDS } from './config';
 import { toast } from '../stores/toast';
-import { paperTradingStats } from '../stores/trading';
+import { paperTradingStats, tradingStats } from '../stores/trading';
 
 export class TradingAgent {
   private client: GSwapSDKClient;
@@ -16,8 +17,10 @@ export class TradingAgent {
   private logger: TradingLogger;
   private config: TradingConfig;
   private paperManager: PaperTradingManager | null = null;
+  private liveStatsTracker: LiveTradingStatsTracker;
   private isRunning = false;
   private intervalId?: NodeJS.Timeout;
+  private statsUpdateInterval?: NodeJS.Timeout;
   private currentTrades: Map<string, Trade> = new Map();
   private selectedPool: LiquidityPool | null = null;
   private hasExecutedTestTrade = false;
@@ -35,6 +38,7 @@ export class TradingAgent {
     this.strategy = new TradingStrategy(config);
     this.logger = logger;
     this.paperManager = paperManager || null;
+    this.liveStatsTracker = new LiveTradingStatsTracker();
   }
 
   setPaperManager(manager: PaperTradingManager) {
@@ -242,10 +246,22 @@ export class TradingAgent {
       // Get available balance for the input token
       if (this.config.paperTrading && this.paperManager) {
         availableTokenBalance = this.paperManager.getBalance(tokenIn);
+        this.logger.logSystem(`[Paper Trading] ${tokenIn} balance: ${availableTokenBalance}`, 'info');
       } else {
         const balances = await this.wallet.getBalances();
-        const tokenBalance = balances.find(b => b.token === tokenIn);
+        console.log('[TradingAgent] All wallet balances:', balances);
+        const tokenBalance = balances.find(b => b.token === tokenIn || b.token === `${tokenIn} (GalaChain)`);
         availableTokenBalance = parseFloat(tokenBalance?.balance || '0');
+        this.logger.logSystem(`[Live Trading] ${tokenIn} balance: ${availableTokenBalance} (from wallet)`, 'info');
+        
+        // Log all balances for debugging
+        if (balances.length > 0) {
+          balances.forEach(b => {
+            console.log(`[TradingAgent] Token: ${b.token}, Balance: ${b.balance}, Value: ${b.value}`);
+          });
+        } else {
+          console.log('[TradingAgent] No balances found in wallet!');
+        }
       }
 
       // Calculate the maximum we can trade based on available token balance
@@ -293,7 +309,19 @@ export class TradingAgent {
       } else {
         // Check live wallet balance
         const balances = await this.wallet.getBalances();
-        const tokenInBalance = balances.find(b => b.token === tokenIn);
+        
+        // Debug: log all balances
+        console.log('[TradingAgent] All wallet balances:', balances);
+        
+        // Find the balance - check both exact match and with (GalaChain) suffix
+        const tokenInBalance = balances.find(b => 
+          b.token === tokenIn || 
+          b.token === `${tokenIn} (GalaChain)` ||
+          b.token.replace(' (GalaChain)', '') === tokenIn
+        );
+        
+        console.log(`[TradingAgent] Looking for ${tokenIn}, found:`, tokenInBalance);
+        
         const availableBalance = parseFloat(tokenInBalance?.balance || '0');
 
         if (availableBalance < parseFloat(amountIn)) {

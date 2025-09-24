@@ -4,6 +4,7 @@
   import { walletService } from '$lib/services/wallet';
   import type { TradingAgent } from '$lib/trading/agent';
   import type { TradingLogger } from '$lib/trading/logger';
+  import ForceRefreshBalance from './ForceRefreshBalance.svelte';
 
   export let agent: TradingAgent | null;
   export let logger: TradingLogger;
@@ -182,6 +183,11 @@
       </div>
     </div>
   {/if}
+  
+  <!-- Add ForceRefreshBalance button for debugging -->
+  <div class="mt-4">
+    <ForceRefreshBalance />
+  </div>
 </div>
 
 {#if showEditModal}

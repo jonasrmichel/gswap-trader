@@ -145,20 +145,58 @@ export class GSwapSDKClient {
 
   async getUserAssets(walletAddress: string): Promise<any> {
     if (!this.gswap) {
-      console.log('GSwap not connected - cannot fetch assets');
+      console.log('[GSwapSDKClient] GSwap not connected - cannot fetch assets');
       return { tokens: [], count: 0 };
     }
 
     try {
       // Convert Ethereum address to GalaChain format
       const galaChainAddress = walletAddress.startsWith('0x')
-        ? `eth|${walletAddress.slice(2)}`
+        ? `eth|${walletAddress.slice(2).toLowerCase()}`
         : walletAddress;
 
-      return await this.gswap.assets.getUserAssets(galaChainAddress, 1, 20);
+      console.log('[GSwapSDKClient] Fetching assets for address:', galaChainAddress);
+      const result = await this.gswap.assets.getUserAssets(galaChainAddress, 1, 20);
+      console.log('[GSwapSDKClient] Assets fetched:', result);
+      
+      // If no tokens, try fetching specific token balances
+      if (!result.tokens || result.tokens.length === 0) {
+        console.log('[GSwapSDKClient] No tokens found, trying individual balance queries');
+        // Try to fetch individual balances for common tokens
+        const commonTokens = ['GALA', 'GWETH', 'GUSDC', 'GUSDT'];
+        const tokens = [];
+        
+        for (const symbol of commonTokens) {
+          try {
+            const balance = await this.getBalance(`${symbol}|Unit|none|none`, walletAddress);
+            if (balance !== '0') {
+              tokens.push({
+                symbol,
+                quantity: balance,
+                decimals: 8
+              });
+            }
+          } catch (e) {
+            console.log(`[GSwapSDKClient] Could not fetch ${symbol} balance:`, e);
+          }
+        }
+        
+        return { tokens, count: tokens.length };
+      }
+      
+      return result;
     } catch (error) {
-      console.error('Failed to fetch user assets:', error);
-      return { tokens: [], count: 0 };
+      console.error('[GSwapSDKClient] Failed to fetch user assets:', error);
+      // Return default tokens with 0 balance
+      return { 
+        tokens: [
+          { symbol: 'GALA', quantity: '0', decimals: 8 },
+          { symbol: 'GWETH', quantity: '0', decimals: 8 },
+          { symbol: 'GUSDC', quantity: '0', decimals: 8 },
+          { symbol: 'GUSDT', quantity: '0', decimals: 8 }
+        ], 
+        count: 4 
+      };
     }
   }
 
