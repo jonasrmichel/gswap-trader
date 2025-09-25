@@ -84,82 +84,278 @@ class ComprehensiveWalletAnalyzer {
         return;
       }
       
-      // Extract transaction data from the table
-      const transactions = await page.evaluate(() => {
-        const rows = document.querySelectorAll('tbody tr');
-        const txs = [];
-        
-        rows.forEach((row) => {
-          const cells = Array.from(row.querySelectorAll('td'));
-          if (cells.length >= 7) {
-            // Based on the screenshot structure:
-            // 0: Transaction Hash, 1: Method, 2: From, 3: To, 4: Age, 5: Token, 6: Amount, 7: Fee
-            const tx = {
-              hash: cells[0]?.textContent?.trim() || '',
-              method: cells[1]?.textContent?.trim() || '',
-              from: cells[2]?.textContent?.trim() || '',
-              to: cells[3]?.textContent?.trim() || '',
-              age: cells[4]?.textContent?.trim() || '',
-              token: cells[5]?.textContent?.trim() || '',
-              amount: cells[6]?.textContent?.trim() || '',
-              fee: cells[7]?.textContent?.trim() || ''
-            };
-            
-            // Parse swap details from method
-            if (tx.method.includes('Swap')) {
-              tx.type = 'swap';
+      // Check if there's a dropdown to show more items per page
+      const expandedView = await page.evaluate(() => {
+        const selects = document.querySelectorAll('select');
+        for (const select of selects) {
+          const options = Array.from(select.options);
+          // Look for option to show 100 or max items
+          const maxOption = options.find(opt => 
+            opt.text.includes('100') || opt.text.includes('All') || parseInt(opt.value) >= 100
+          );
+          if (maxOption) {
+            select.value = maxOption.value;
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+            return true;
+          }
+        }
+        return false;
+      });
+      
+      if (expandedView) {
+        console.log('  Expanded items per page, waiting for reload...');
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        await page.waitForSelector('tbody tr', { timeout: 5000 });
+      }
+      
+      // Keep loading transactions until we reach the start date
+      let allTransactions = [];
+      let pageNumber = 1;
+      let reachedStartDate = false;
+      let previousCount = 0;
+      
+      while (!reachedStartDate) {
+        // Extract current page transactions
+        const pageTransactions = await page.evaluate(() => {
+          const rows = document.querySelectorAll('tbody tr');
+          const txs = [];
+          
+          rows.forEach((row) => {
+            const cells = Array.from(row.querySelectorAll('td'));
+            if (cells.length >= 7) {
+              // Based on the screenshot structure:
+              // 0: Transaction Hash, 1: Method, 2: From, 3: To, 4: Age, 5: Token, 6: Amount, 7: Fee
+              const tx = {
+                hash: cells[0]?.textContent?.trim() || '',
+                method: cells[1]?.textContent?.trim() || '',
+                from: cells[2]?.textContent?.trim() || '',
+                to: cells[3]?.textContent?.trim() || '',
+                age: cells[4]?.textContent?.trim() || '',
+                token: cells[5]?.textContent?.trim() || '',
+                amount: cells[6]?.textContent?.trim() || '',
+                fee: cells[7]?.textContent?.trim() || ''
+              };
               
-              // Look for from/to details in the from/to fields
-              if (tx.from.includes('→') || tx.from.includes('->')) {
-                const parts = tx.from.split(/→|->/).map(s => s.trim());
-                if (parts.length === 2) {
-                  const fromMatch = parts[0].match(/(\d+\.?\d*)\s*(\w+)/);
-                  const toMatch = parts[1].match(/(\d+\.?\d*)\s*(\w+)/);
-                  if (fromMatch) {
-                    tx.amountIn = parseFloat(fromMatch[1]);
-                    tx.tokenIn = fromMatch[2];
-                  }
-                  if (toMatch) {
-                    tx.amountOut = parseFloat(toMatch[1]);
-                    tx.tokenOut = toMatch[2];
+              // Parse swap details from method
+              if (tx.method.includes('Swap')) {
+                tx.type = 'swap';
+                
+                // Look for from/to details in the from/to fields
+                if (tx.from.includes('→') || tx.from.includes('->')) {
+                  const parts = tx.from.split(/→|->/).map(s => s.trim());
+                  if (parts.length === 2) {
+                    const fromMatch = parts[0].match(/(\d+\.?\d*)\s*(\w+)/);
+                    const toMatch = parts[1].match(/(\d+\.?\d*)\s*(\w+)/);
+                    if (fromMatch) {
+                      tx.amountIn = parseFloat(fromMatch[1]);
+                      tx.tokenIn = fromMatch[2];
+                    }
+                    if (toMatch) {
+                      tx.amountOut = parseFloat(toMatch[1]);
+                      tx.tokenOut = toMatch[2];
+                    }
                   }
                 }
               }
+              
+              // Parse timestamp from age (e.g., "49 minutes" -> approximate time)
+              if (tx.age) {
+                tx.timestamp = tx.age;
+              }
+              
+              txs.push(tx);
             }
-            
-            // Parse timestamp from age (e.g., "49 minutes" -> approximate time)
-            if (tx.age) {
-              tx.timestamp = tx.age;
-            }
-            
-            txs.push(tx);
-          }
+          });
+          
+          return txs;
         });
         
-        return txs;
-      });
-      
-      console.log(`  ✅ Found ${transactions.length} transactions`);
-      this.data.transactions = transactions;
-      
-      // Try to load more if there's pagination
-      const hasLoadMore = await page.evaluate(() => {
-        const buttons = Array.from(document.querySelectorAll('button'));
-        return buttons.some(btn => 
-          btn.textContent.toLowerCase().includes('load more') ||
-          btn.textContent.toLowerCase().includes('next')
+        // Add new unique transactions (avoid duplicates)
+        const newTransactions = pageTransactions.filter(tx => 
+          !allTransactions.some(existing => existing.hash === tx.hash)
         );
-      });
-      
-      if (hasLoadMore) {
-        console.log('  📄 More transactions available (pagination detected)');
+        allTransactions.push(...newTransactions);
+        
+        console.log(`  Page ${pageNumber}: Found ${pageTransactions.length} transactions (${allTransactions.length} total)`);
+        
+        // Check if oldest transaction has passed our start date
+        if (pageTransactions.length > 0) {
+          const oldestTx = pageTransactions[pageTransactions.length - 1];
+          if (oldestTx.age) {
+            const txDate = this.parseRelativeTime(oldestTx.age);
+            if (txDate < this.startDate) {
+              console.log(`  Reached start date with transaction from ${oldestTx.age}`);
+              reachedStartDate = true;
+              break;
+            }
+          }
+        }
+        
+        // Check if no new transactions were loaded (reached end)
+        if (allTransactions.length === previousCount) {
+          console.log('  No new transactions loaded, reached end of history');
+          break;
+        }
+        previousCount = allTransactions.length;
+        
+        // Try to load more transactions
+        const loadedMore = await this.loadMoreTransactions(page, pageNumber);
+        if (!loadedMore) {
+          console.log('  No more transactions to load');
+          break;
+        }
+        
+        pageNumber++;
+        
+        // Safety limit to prevent infinite loops
+        if (pageNumber > 50) {
+          console.log('  Reached maximum page limit (50)');
+          break;
+        }
       }
+      
+      console.log(`  ✅ Total transactions scraped: ${allTransactions.length}`);
+      this.data.transactions = allTransactions;
       
     } catch (error) {
       console.log(`  ❌ Error fetching transactions: ${error.message}`);
       this.data.transactions = [];
     } finally {
       await browser.close();
+    }
+  }
+  
+  parseRelativeTime(ageStr) {
+    const now = new Date();
+    const match = ageStr.match(/(\d+)\s*(second|minute|hour|day|week|month|year)s?/);
+    
+    if (match) {
+      const amount = parseInt(match[1]);
+      const unit = match[2];
+      
+      switch (unit) {
+        case 'second': return new Date(now - amount * 1000);
+        case 'minute': return new Date(now - amount * 60 * 1000);
+        case 'hour': return new Date(now - amount * 60 * 60 * 1000);
+        case 'day': return new Date(now - amount * 24 * 60 * 60 * 1000);
+        case 'week': return new Date(now - amount * 7 * 24 * 60 * 60 * 1000);
+        case 'month': return new Date(now - amount * 30 * 24 * 60 * 60 * 1000);
+        case 'year': return new Date(now - amount * 365 * 24 * 60 * 60 * 1000);
+      }
+    }
+    
+    return now;
+  }
+  
+  async loadMoreTransactions(page, currentPage = 1) {
+    try {
+      // Method 1: Look for pagination buttons at the bottom
+      const paginationExists = await page.evaluate(() => {
+        // Check for common pagination selectors
+        const selectors = [
+          '.MuiPagination-root',
+          '.pagination',
+          '[role="navigation"]',
+          '.ant-pagination'
+        ];
+        
+        for (const selector of selectors) {
+          const element = document.querySelector(selector);
+          if (element) return true;
+        }
+        return false;
+      });
+      
+      if (paginationExists) {
+        // Look for numbered page buttons (GalaScan uses numbered pagination)
+        const clickedNext = await page.evaluate(() => {
+          // Find all buttons with numbers
+          const buttons = Array.from(document.querySelectorAll('button'));
+          const pageButtons = buttons.filter(btn => {
+            const text = btn.textContent.trim();
+            return /^\d+$/.test(text);
+          });
+          
+          if (pageButtons.length > 1) {
+            // Sort buttons by page number
+            pageButtons.sort((a, b) => {
+              return parseInt(a.textContent) - parseInt(b.textContent);
+            });
+            
+            // Find the first non-disabled button with a higher page number
+            // Look for button with style indicating it's not selected
+            for (const btn of pageButtons) {
+              const pageNum = parseInt(btn.textContent);
+              const isSelected = btn.style.backgroundColor === 'rgb(99, 102, 241)' || 
+                                btn.classList.contains('Mui-selected') ||
+                                btn.getAttribute('aria-current') === 'page';
+              
+              if (!isSelected && !btn.disabled && pageNum > 1) {
+                console.log(`Clicking page ${pageNum} button`);
+                btn.click();
+                return true;
+              }
+            }
+          }
+          
+          return false;
+        });
+        
+        if (clickedNext) {
+          console.log('  Clicked next page, waiting for load...');
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          await page.waitForSelector('tbody tr', { timeout: 5000 });
+          return true;
+        }
+      }
+      
+      // Method 2: Scroll to bottom to trigger infinite scroll
+      const scrolledAndLoaded = await page.evaluate(async () => {
+        const initialRowCount = document.querySelectorAll('tbody tr').length;
+        
+        // Scroll to bottom
+        window.scrollTo(0, document.body.scrollHeight);
+        
+        // Wait a bit for potential lazy loading
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        const newRowCount = document.querySelectorAll('tbody tr').length;
+        return newRowCount > initialRowCount;
+      });
+      
+      if (scrolledAndLoaded) {
+        console.log('  Scrolled and loaded more transactions');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return true;
+      }
+      
+      // Method 3: Look for and click a "Load More" button
+      const loadMoreClicked = await page.evaluate(() => {
+        const buttons = Array.from(document.querySelectorAll('button'));
+        const loadMoreBtn = buttons.find(btn => {
+          const text = btn.textContent.toLowerCase();
+          return text.includes('load more') || 
+                 text.includes('show more') || 
+                 text.includes('view more');
+        });
+        
+        if (loadMoreBtn && !loadMoreBtn.disabled) {
+          loadMoreBtn.click();
+          return true;
+        }
+        return false;
+      });
+      
+      if (loadMoreClicked) {
+        console.log('  Clicked "Load More" button');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.log(`  Could not load more: ${error.message}`);
+      return false;
     }
   }
 
