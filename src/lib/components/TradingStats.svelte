@@ -1,13 +1,45 @@
 <script lang="ts">
   import { tradingStats, tradingConfig, paperTradingStats, liveTradingStats, initialBalance } from '$lib/stores/trading';
+  import type { LiveTradingStats } from '$lib/trading/live-stats';
+
+  type PaperTradingStats = {
+    initialBalance: number;
+    currentValue: number;
+    profitLoss: number;
+    profitLossPercent: number;
+    totalTrades: number;
+    winningTrades: number;
+    losingTrades: number;
+    winRate: number;
+    avgProfit: number;
+    avgLoss: number;
+  };
+
+  type CombinedStats = Partial<LiveTradingStats> & Partial<PaperTradingStats>;
 
   function formatNumber(num: number) {
     return num.toLocaleString('en-US', { maximumFractionDigits: 2 });
   }
   
+  let stats: CombinedStats = {};
+
   // Use paper or live stats based on trading mode
-  $: stats = $tradingConfig.paperTrading ? $paperTradingStats : $liveTradingStats;
+  $: stats = ($tradingConfig.paperTrading ? $paperTradingStats : $liveTradingStats) as CombinedStats;
   $: displayInitialBalance = $tradingConfig.paperTrading ? $initialBalance : $liveTradingStats.initialBalance;
+  $: currentValue = $tradingConfig.paperTrading
+    ? (stats.currentValue ?? 0)
+    : (stats.totalValue ?? stats.currentBalance ?? 0);
+  $: profitLossValue = stats.profitLoss ?? 0;
+  $: profitLossPercent = stats.profitLossPercent ?? 0;
+  $: winRateValue = stats.winRate ?? $tradingStats.winRate ?? 0;
+  $: winningTrades = stats.winningTrades ?? 0;
+  $: losingTrades = stats.losingTrades ?? 0;
+  $: avgProfit = stats.avgProfit ?? 0;
+  $: avgLoss = stats.avgLoss ?? 0;
+  $: totalTrades = stats.totalTrades ?? $tradingStats.totalTrades ?? 0;
+  $: successfulTrades = stats.successfulTrades ?? $tradingStats.successfulTrades ?? 0;
+  $: totalVolume = stats.totalVolume ?? 0;
+  $: totalFees = stats.fees ?? 0;
 </script>
 
 <div class="bg-surface-default backdrop-blur-sm rounded-xl border border-border-subtle p-6">
@@ -24,46 +56,46 @@
     <div class="bg-surface-hover rounded-lg p-3">
       <div class="text-xs text-muted">Current Value</div>
       <div class="text-lg font-semibold">
-        ${formatNumber($tradingConfig.paperTrading ? stats.currentValue : stats.totalValue || stats.currentBalance || 0)}
+        ${formatNumber(currentValue)}
       </div>
     </div>
 
     <div class="bg-surface-hover rounded-lg p-3">
       <div class="text-xs text-muted">P&L</div>
-      <div class="text-lg font-semibold {stats.profitLoss >= 0 ? 'text-success' : 'text-destructive'}">
-        ${formatNumber(stats.profitLoss)}
-        <span class="text-sm">({stats.profitLossPercent?.toFixed(2) || '0.00'}%)</span>
+      <div class="text-lg font-semibold {profitLossValue >= 0 ? 'text-success' : 'text-destructive'}">
+        ${formatNumber(profitLossValue)}
+        <span class="text-sm">({profitLossPercent.toFixed(2)}%)</span>
       </div>
     </div>
 
     <div class="bg-surface-hover rounded-lg p-3">
       <div class="text-xs text-muted">Win Rate</div>
-      <div class="text-lg font-semibold">{stats.winRate?.toFixed(1) || '0.0'}%</div>
+      <div class="text-lg font-semibold">{winRateValue.toFixed(1)}%</div>
       <div class="text-xs text-muted mt-1">
-        {stats.winningTrades || 0}W / {stats.losingTrades || 0}L
+        {winningTrades}W / {losingTrades}L
       </div>
     </div>
 
     <div class="bg-surface-hover rounded-lg p-3">
       <div class="text-xs text-muted">Avg Profit/Loss</div>
-      <div class="text-sm font-semibold text-success">+{stats.avgProfit?.toFixed(2) || '0.00'}%</div>
-      <div class="text-sm font-semibold text-destructive">{stats.avgLoss?.toFixed(2) || '0.00'}%</div>
+      <div class="text-sm font-semibold text-success">+{avgProfit.toFixed(2)}%</div>
+      <div class="text-sm font-semibold text-destructive">{avgLoss.toFixed(2)}%</div>
     </div>
   </div>
 
   <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
     <div class="bg-surface-hover rounded-lg p-3">
       <div class="text-xs text-muted">Total Trades</div>
-      <div class="text-lg font-semibold">{stats.totalTrades || $tradingStats.totalTrades}</div>
+      <div class="text-lg font-semibold">{totalTrades}</div>
       <div class="text-xs text-muted mt-1">
-        {stats.successfulTrades || $tradingStats.successfulTrades} successful
+        {successfulTrades} successful
       </div>
     </div>
 
     <div class="bg-surface-hover rounded-lg p-3">
       <div class="text-xs text-muted">Win Rate</div>
-      <div class="text-lg font-semibold {(stats.winRate || $tradingStats.winRate) >= 50 ? 'text-success' : 'text-warning'}">
-        {(stats.winRate || $tradingStats.winRate).toFixed(1)}%
+      <div class="text-lg font-semibold {winRateValue >= 50 ? 'text-success' : 'text-warning'}">
+        {winRateValue.toFixed(1)}%
       </div>
     </div>
 
@@ -72,7 +104,7 @@
       <div class="text-lg font-semibold">
         {$tradingConfig.paperTrading 
           ? $tradingStats.totalSignals 
-          : stats.totalVolume ? `$${formatNumber(stats.totalVolume)}` : '0'}
+          : totalVolume ? `$${formatNumber(totalVolume)}` : '0'}
       </div>
       {#if $tradingConfig.paperTrading}
         <div class="text-xs text-muted mt-1">
@@ -86,7 +118,7 @@
       <div class="text-lg font-semibold">
         {$tradingConfig.paperTrading 
           ? `${$tradingStats.avgSignalConfidence.toFixed(1)}%`
-          : stats.fees ? `$${formatNumber(stats.fees)}` : '$0'}
+          : totalFees ? `$${formatNumber(totalFees)}` : '$0'}
       </div>
     </div>
   </div>

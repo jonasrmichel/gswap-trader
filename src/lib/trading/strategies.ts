@@ -70,7 +70,7 @@ export class TradingStrategy {
         const variation = 1 + (Math.random() - 0.5) * 0.02; // ±1% variation
         const syntheticPrice = currentPrice * variation;
         history.push({
-          timestamp: new Date(Date.now() - i * 60000), // 1 minute intervals
+          timestamp: Date.now() - i * 60000, // 1 minute intervals
           price: syntheticPrice,
           volume: parseFloat(pool.volume24h?.toString() || '1000') / 1440 // Daily volume / minutes
         });

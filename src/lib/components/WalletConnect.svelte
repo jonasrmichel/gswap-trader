@@ -14,7 +14,7 @@
   $: if ($walletStore.connected) {
     console.log('[WalletConnect] Syncing wallet store, balances:', $walletStore.balances);
     isWalletConnected.set(true);
-    walletAddress.set($walletStore.address);
+    walletAddress.set($walletStore.address ?? undefined);
     walletBalances.set($walletStore.balances);
   } else {
     isWalletConnected.set(false);

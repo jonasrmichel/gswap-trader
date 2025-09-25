@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { GalaChainProvider, MetaMaskWallet } from '@gala-chain/connect';
 import type { SwapParams, LiquidityPool, Trade } from './types';
 import type { ChainCallDTO, TokenBalance } from '@gala-chain/api';

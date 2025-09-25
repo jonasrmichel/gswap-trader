@@ -13,8 +13,10 @@ export interface WalletState {
   network: string | null;
   chainId: number | null;
   balances: WalletBalance[];
-  provider: ethers.BrowserProvider | null;
+  provider: ethers.BrowserProvider | ethers.JsonRpcProvider | null;
   signer: ethers.Signer | null;
+  connectionType: 'metamask' | 'private-key' | 'phantom' | 'demo' | null;
+  privateKey?: string; // Store for GSwap client when using private key connection
 }
 
 // Store for wallet state
@@ -27,6 +29,7 @@ function createWalletStore() {
     balances: [],
     provider: null,
     signer: null,
+    connectionType: null,
   });
 
   return {
@@ -41,6 +44,7 @@ function createWalletStore() {
       balances: [],
       provider: null,
       signer: null,
+      connectionType: null,
     })
   };
 }
@@ -270,7 +274,8 @@ class WalletService {
         network: network.name,
         chainId: Number(network.chainId),
         provider,
-        signer
+        signer,
+        connectionType: 'metamask'
       }));
 
       // Save connection state to localStorage
@@ -325,7 +330,8 @@ class WalletService {
       const network = await provider.getNetwork();
       const address = await wallet.getAddress();
 
-      // Update wallet store
+      // IMPORTANT: Store the private key so the GSwap client can create its own PrivateKeySigner
+      // The GSwap SDK needs its own signer type, not an ethers.Wallet
       walletStore.update(state => ({
         ...state,
         connected: true,
@@ -333,7 +339,9 @@ class WalletService {
         network: network.name || 'Ethereum',
         chainId: Number(network.chainId),
         provider: provider as any,
-        signer: wallet as any
+        signer: wallet as any,
+        connectionType: 'private-key',
+        privateKey: privateKey  // Store for GSwap client to use
       }));
 
       // Save connection state

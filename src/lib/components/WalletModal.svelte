@@ -6,6 +6,12 @@
   export let onConnect: () => void;
   export let onClose: () => void;
   export let isConnecting = false;
+
+  function handlePrivateKeyInput(event: Event) {
+    const target = event.currentTarget as HTMLInputElement;
+    privateKey = target.value;
+    console.log('[WalletModal] Private key input changed:', privateKey.length, 'chars');
+  }
 </script>
 
 <!-- Render modal at body level to avoid z-index issues -->
@@ -40,17 +46,14 @@
 
         {#if selectedType === 'private-key'}
           <div class="mt-4">
-            <label class="block text-sm font-medium mb-2 text-muted">Private Key</label>
+            <label class="block text-sm font-medium mb-2 text-muted" for="wallet-private-key">Private Key</label>
             <input
               type="password"
               bind:value={privateKey}
               placeholder="Enter your private key"
+              id="wallet-private-key"
               class="w-full px-3 py-2 bg-card-darker rounded-lg border border-border-subtle text-foreground placeholder-muted focus:border-accent focus:outline-none focus:bg-surface-solid transition-colors"
-              on:input={(e) => {
-                // Ensure we only get the input value
-                privateKey = e.target.value;
-                console.log('[WalletModal] Private key input changed:', privateKey.length, 'chars');
-              }}
+              on:input={handlePrivateKeyInput}
             />
           </div>
         {/if}

@@ -161,7 +161,7 @@
       class="px-6 py-3 rounded-lg font-medium transition-all transform hover:scale-105
         {$tradingActive
           ? 'bg-destructive text-white hover:bg-destructive/90'
-          : 'bg-accent text-white hover:bg-accent/90'}
+          : 'bg-success text-white hover:bg-success/90'}
         {!$isWalletConnected ? 'opacity-50 cursor-not-allowed' : ''}"
     >
       {$tradingActive ? 'Stop Trading' : 'Start Trading'}
@@ -190,13 +190,14 @@
       <h2 class="text-xl font-bold mb-4 text-accent">Configure Initial Balance</h2>
 
       <div class="mb-4">
-        <label class="block text-sm font-medium mb-2 text-muted">Initial Trading Balance (USD)</label>
+        <label class="block text-sm font-medium mb-2 text-muted" for="initial-balance-input">Initial Trading Balance (USD)</label>
         <input
           type="number"
           bind:value={balanceInput}
           min="100"
           max="1000000"
           step="100"
+          id="initial-balance-input"
           class="w-full px-3 py-2 bg-card-darker rounded-lg border border-border-subtle text-foreground focus:border-accent focus:outline-none transition-colors"
         />
         <div class="mt-2 text-xs text-muted">

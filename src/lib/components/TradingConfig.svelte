@@ -38,7 +38,7 @@
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
     <!-- Risk Level -->
     <div>
-      <label class="block text-sm font-medium mb-2">Risk Level</label>
+      <p class="block text-sm font-medium mb-2">Risk Level</p>
       <div class="space-y-2">
         {#each ['safe', 'balanced', 'aggressive'] as risk}
           <button
@@ -63,7 +63,7 @@
 
     <!-- Strategy -->
     <div>
-      <label class="block text-sm font-medium mb-2">Strategy</label>
+      <p class="block text-sm font-medium mb-2">Strategy</p>
       <div class="space-y-2">
         {#each ['trend', 'revert', 'range'] as strategy}
           <button
@@ -92,7 +92,7 @@
 
     <!-- Speed -->
     <div>
-      <label class="block text-sm font-medium mb-2">Speed</label>
+      <p class="block text-sm font-medium mb-2">Speed</p>
       <div class="space-y-2">
         {#each [
           { value: 'fast', label: 'Scalping', desc: '1 min candles' },
@@ -117,7 +117,7 @@
 
     <!-- Signal Confidence -->
     <div>
-      <label class="block text-sm font-medium mb-2">Signals</label>
+      <p class="block text-sm font-medium mb-2">Signals</p>
       <div class="space-y-2">
         {#each [
           { value: 'precise', label: 'Conservative', desc: '3+ indicators' },
@@ -142,7 +142,7 @@
 
     <!-- Market Bias -->
     <div>
-      <label class="block text-sm font-medium mb-2">Bias</label>
+      <p class="block text-sm font-medium mb-2">Bias</p>
       <div class="space-y-2">
         {#each ['bullish', 'neutral', 'bearish'] as bias}
           <button

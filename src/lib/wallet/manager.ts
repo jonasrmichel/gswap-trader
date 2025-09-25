@@ -1,7 +1,6 @@
 import { ethers } from 'ethers';
 import type { GSwapSDKClient } from '../gswap/gswap-sdk-client';
-import { walletStore, type WalletState } from '../services/wallet';
-import { get } from 'svelte/store';
+import { walletStore, type WalletState, type WalletBalance } from '../services/wallet';
 
 export type WalletType = 'private-key' | 'phantom' | 'metamask' | 'demo';
 
@@ -9,12 +8,6 @@ export interface WalletConfig {
   type: WalletType;
   address?: string;
   privateKey?: string;
-}
-
-export interface WalletBalance {
-  token: string;
-  balance: string;
-  value?: number;
 }
 
 export class WalletManager {
@@ -31,12 +24,19 @@ export class WalletManager {
       // Sync connected state and pass signer to GSwap client
       if (state.connected && state.address) {
         this.connected = true;
+        const inferredType = (state.connectionType || this.config?.type || 'metamask') as WalletType;
         this.config = {
-          type: 'metamask',
+          type: inferredType,
           address: state.address
         };
-        // Pass signer to GSwap client when wallet connects
-        if (state.signer) {
+        // Handle GSwap client connection based on connection type
+        if (state.connectionType === 'private-key' && (state as any).privateKey) {
+          // For private key connections, use the connect method which creates PrivateKeySigner
+          console.log('[WalletManager] Using private key connection for GSwap');
+          await this.client.connect((state as any).privateKey);
+        } else if (state.signer) {
+          // For MetaMask connections, use setSigner
+          console.log('[WalletManager] Using MetaMask signer for GSwap');
           await this.client.setSigner(state.signer);
         }
       } else {
@@ -56,7 +56,11 @@ export class WalletManager {
         if (!config.privateKey) {
           throw new Error('Private key required');
         }
-        const address = await this.client.connect(config.privateKey);
+        // The GSwap client connection will be handled by the wallet store subscription
+        // We just need to get the address here
+        const { ethers } = await import('ethers');
+        const wallet = new ethers.Wallet(config.privateKey);
+        const address = wallet.address;
         this.config.address = address;
         this.connected = true;
         return address;
@@ -74,16 +78,21 @@ export class WalletManager {
       case 'phantom':
         if (typeof window !== 'undefined' && (window as any).solana) {
           const resp = await (window as any).solana.connect();
-          this.config.address = resp.publicKey.toString();
+          const address = resp?.publicKey?.toString();
+          if (!address) {
+            throw new Error('Phantom wallet did not provide an address');
+          }
+          this.config.address = address;
           this.connected = true;
-          return this.config.address;
+          return address;
         }
         throw new Error('Phantom wallet not found');
 
       case 'demo':
-        this.config.address = '0xDemo' + Math.random().toString(16).substring(2, 42);
+        const demoAddress = '0xDemo' + Math.random().toString(16).substring(2, 42);
+        this.config.address = demoAddress;
         this.connected = true;
-        return this.config.address;
+        return demoAddress;
 
       default:
         throw new Error('Unsupported wallet type');
@@ -96,7 +105,16 @@ export class WalletManager {
   }
 
   isConnected(): boolean {
-    return this.walletState?.connected || false;
+    // Check both wallet state AND client connection
+    // If we have a private key connection through the client, we're connected
+    const clientConnected = this.client.isConnected();
+    const walletStateConnected = this.walletState?.connected || false;
+    
+    if (clientConnected || walletStateConnected) {
+      console.log('[WalletManager] isConnected check - client:', clientConnected, 'wallet:', walletStateConnected);
+      return true;
+    }
+    return false;
   }
 
   getAddress(): string | undefined {
@@ -107,89 +125,112 @@ export class WalletManager {
     return this.config?.type;
   }
 
+  private normalizeTokenSymbol(token: string | undefined): string {
+    if (!token) {
+      return '';
+    }
+
+    const cleaned = token.replace(/\s*\(GalaChain\)/gi, '').trim();
+    const upper = cleaned.toUpperCase();
+
+    if (upper === 'USDC') return 'GUSDC';
+    if (upper === 'USDT') return 'GUSDT';
+    if (upper === 'ETH' || upper === 'WETH') return 'GWETH';
+
+    return upper;
+  }
+
+  private estimateTokenPrice(symbol: string): number {
+    const upper = symbol.toUpperCase();
+    const priceMap: Record<string, number> = {
+      GALA: 0.02,
+      GUSDC: 1,
+      GUSDT: 1,
+      GWETH: 3500,
+      USDC: 1,
+      USDT: 1,
+      ETH: 3500,
+      WETH: 3500,
+      BNB: 600,
+      MATIC: 0.8,
+    };
+
+    return priceMap[upper] ?? priceMap[upper.startsWith('G') ? upper.slice(1) : upper] ?? 0;
+  }
+
+  private sanitizeBalanceValue(balance: any): string {
+    if (typeof balance === 'string') {
+      return balance;
+    }
+    if (typeof balance === 'number') {
+      return balance.toString();
+    }
+    if (balance && typeof balance === 'object' && typeof balance.toString === 'function') {
+      try {
+        return balance.toString();
+      } catch {
+        return '0';
+      }
+    }
+    return '0';
+  }
+
+  private async fetchGalaChainBalances(walletAddress: string): Promise<WalletBalance[]> {
+    try {
+      // Add timestamp to force fresh fetch
+      console.log('[WalletManager] Fetching fresh GalaChain balances at', new Date().toISOString());
+      
+      const assets: any = await this.client.getUserAssets(walletAddress);
+      const tokens: any[] = Array.isArray(assets?.tokens)
+        ? assets.tokens
+        : Array.isArray(assets?.token)
+          ? assets.token
+          : [];
+
+      const balances = tokens
+        .map((token: any) => {
+          const symbol = this.normalizeTokenSymbol(token?.symbol || token?.token || token?.id);
+          if (!symbol) {
+            return null;
+          }
+
+          const balance = this.sanitizeBalanceValue(token?.quantity ?? token?.balance ?? '0');
+          const numericBalance = parseFloat(balance || '0');
+          const value = Number.isFinite(numericBalance)
+            ? numericBalance * this.estimateTokenPrice(symbol)
+            : 0;
+
+          return {
+            token: symbol,
+            balance,
+            value,
+          } as WalletBalance;
+        })
+        .filter((entry): entry is WalletBalance => Boolean(entry));
+      
+      console.log('[WalletManager] Fetched balances:', balances.map(b => `${b.token}: ${b.balance}`).join(', '));
+      return balances;
+    } catch (error: any) {
+      // Only log if it's not a 400 error (which is expected for unregistered wallets)
+      if (!error?.message?.includes('400') && !error?.message?.includes('Bad Request')) {
+        console.warn('[WalletManager] Error fetching balances:', error?.message || 'Unknown error');
+      }
+      return [];
+    }
+  }
+
+  async refreshBalances(): Promise<void> {
+    // Force refresh wallet service balances first
+    const { updateBalances } = await import('../services/wallet');
+    await updateBalances();
+    
+    // Small delay to ensure wallet service has updated
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
+
   async getBalances(): Promise<WalletBalance[]> {
     if (!this.isConnected()) {
       throw new Error('Wallet not connected');
-    }
-
-    // For private key connection, always fetch fresh balances from GalaChain
-    if (this.config?.type === 'private-key') {
-      console.log('[WalletManager] Private key mode - fetching fresh GalaChain balances');
-      const walletAddress = this.getAddress();
-      if (!walletAddress) {
-        console.error('No wallet address available for balance check');
-        return [];
-      }
-
-      try {
-        // Use GSwap SDK's getUserAssets to fetch all balances at once
-        const assets = await this.client.getUserAssets(walletAddress);
-        console.log('[WalletManager] GalaChain assets fetched:', assets);
-
-        // Map the assets to our wallet balance format
-        const balances: WalletBalance[] = assets.tokens.map((token: any) => {
-          // Get approximate USD values (in production, use real price API)
-          const prices: Record<string, number> = {
-            'GALA': 0.02,
-            'GWETH': 3500,
-            'GUSDC': 1,
-            'GUSDT': 1
-          };
-
-          const price = prices[token.symbol] || 0;
-          const quantity = parseFloat(token.quantity || '0');
-
-          return {
-            token: token.symbol,
-            balance: token.quantity,
-            value: quantity * price
-          };
-        });
-
-        console.log('[WalletManager] Returning GalaChain balances:', balances);
-        return balances;
-      } catch (error) {
-        console.error('Failed to fetch GalaChain balances:', error);
-        // Return empty balances for common tokens if API fails
-        return [
-          { token: 'GALA', balance: '0', value: 0 },
-          { token: 'GWETH', balance: '0', value: 0 },
-          { token: 'GUSDC', balance: '0', value: 0 },
-          { token: 'GUSDT', balance: '0', value: 0 }
-        ];
-      }
-    }
-
-    // Use balances from wallet store if available and not demo
-    if (this.walletState?.balances && this.walletState.balances.length > 0 && this.config?.type !== 'demo') {
-      console.log('[WalletManager] Using balances from wallet store:', this.walletState.balances);
-      // Convert wallet store balances to our format
-      // Handle both formats: "GUSDC (GalaChain)" and "GUSDC"
-      const processedBalances = this.walletState.balances.map(b => {
-        // Extract the base token name - remove any (GalaChain) suffix
-        let tokenName = b.token.replace(' (GalaChain)', '').replace('(GalaChain)', '');
-        
-        // GalaChain tokens already have the G prefix, so don't add it again
-        // Only convert standard tokens to GalaChain format if needed
-        if (tokenName === 'USDC') {
-          tokenName = 'GUSDC';
-        } else if (tokenName === 'ETH' || tokenName === 'WETH') {
-          tokenName = 'GWETH';
-        } else if (tokenName === 'USDT') {
-          tokenName = 'GUSDT';
-        }
-        // If it already starts with G (like GUSDC, GWETH), keep it as is
-        
-        console.log(`[WalletManager] Processed balance: ${b.token} -> ${tokenName}: ${b.balance}`);
-        
-        return {
-          token: tokenName,
-          balance: b.balance,
-          value: b.value || 0
-        };
-      });
-      
-      return processedBalances;
     }
 
     if (this.config?.type === 'demo') {
@@ -201,42 +242,67 @@ export class WalletManager {
       ];
     }
 
-    // Get real balances from GalaChain
     const walletAddress = this.getAddress();
     if (!walletAddress) {
       console.error('No wallet address available for balance check');
       return [];
     }
 
-    try {
-      // Use GSwap SDK's getUserAssets to fetch all balances at once
-      const assets = await this.client.getUserAssets(walletAddress);
+    const merged = new Map<string, WalletBalance>();
 
-      // Map the assets to our wallet balance format
-      const balances: WalletBalance[] = assets.tokens.map((token: any) => {
-        // Get approximate USD values (in production, use real price API)
-        const prices: Record<string, number> = {
-          'GALA': 0.02,
-          'GWETH': 3500,
-          'GUSDC': 1,
-          'GUSDT': 1
-        };
+    const insertBalance = (entry: { token: string; balance: string; value?: number } | null | undefined) => {
+      if (!entry) {
+        return;
+      }
 
-        const price = prices[token.symbol] || 0;
-        const quantity = parseFloat(token.quantity || '0');
+      const token = this.normalizeTokenSymbol(entry.token);
+      if (!token) {
+        return;
+      }
 
-        return {
-          token: token.symbol,
-          balance: token.quantity,
-          value: quantity * price
-        };
-      });
+      const balance = this.sanitizeBalanceValue(entry.balance);
+      const fallbackValue = parseFloat(balance || '0') * this.estimateTokenPrice(token);
+      const normalizedValue = Number.isFinite(entry.value) ? Number(entry.value) : fallbackValue;
 
-      return balances;
-    } catch (error) {
-      console.error('Failed to fetch GalaChain balances:', error);
+      const existing = merged.get(token);
+      const existingValue = existing
+        ? (Number.isFinite(existing.value)
+            ? Number(existing.value)
+            : parseFloat(existing.balance || '0') * this.estimateTokenPrice(token))
+        : -1;
 
-      // Return empty balances for common tokens if API fails
+      if (!existing || normalizedValue > existingValue) {
+        const computedValue = Number.isFinite(normalizedValue)
+          ? normalizedValue
+          : Number.isFinite(fallbackValue)
+            ? fallbackValue
+            : 0;
+
+        merged.set(token, {
+          token,
+          balance,
+          value: computedValue,
+        });
+      }
+    };
+
+    const galaBalances = await this.fetchGalaChainBalances(walletAddress);
+    galaBalances.forEach(insertBalance);
+
+    if (this.walletState?.balances && this.walletState.balances.length > 0) {
+      for (const item of this.walletState.balances) {
+        const token = this.normalizeTokenSymbol(item.token);
+        if (!token) {
+          continue;
+        }
+
+        const balance = this.sanitizeBalanceValue(item.balance);
+        const explicitValue = typeof item.value === 'number' ? item.value : undefined;
+        insertBalance({ token, balance, value: explicitValue });
+      }
+    }
+
+    if (merged.size === 0) {
       return [
         { token: 'GALA', balance: '0', value: 0 },
         { token: 'GWETH', balance: '0', value: 0 },
@@ -244,6 +310,8 @@ export class WalletManager {
         { token: 'GUSDT', balance: '0', value: 0 }
       ];
     }
+
+    return Array.from(merged.values());
   }
 
   async signTransaction(tx: any): Promise<string> {

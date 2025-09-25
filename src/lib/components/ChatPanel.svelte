@@ -23,9 +23,11 @@
         isWalletConnected
     } from '$lib/stores/trading';
     import { walletService } from '$lib/services/wallet';
+    import { getTradingParams } from '$lib/trading/config';
     import { toast } from '$lib/stores/toast';
     import type { TradingAgent } from '$lib/trading/agent';
     import type { TradingLogger } from '$lib/trading/logger';
+    import type { QuickAction } from '$lib/stores/chat';
 
     export let agent: TradingAgent | null = null;
     export let logger: TradingLogger | null = null;
@@ -110,7 +112,9 @@
                 break;
 
             case '/stats':
-                const stats = $tradingStats;
+                const stats: any = $tradingStats;
+                const profitLoss = typeof stats.profitLoss === 'number' ? stats.profitLoss : 0;
+                const profitLossPercent = typeof stats.profitLossPercent === 'number' ? stats.profitLossPercent : 0;
                 addMessage({
                     role: 'assistant',
                     content: `📊 Trading Statistics:
@@ -118,7 +122,7 @@
 • Successful: ${stats.successfulTrades}
 • Failed: ${stats.failedTrades}
 • Win Rate: ${stats.winRate.toFixed(2)}%
-• Profit/Loss: ${stats.profitLoss >= 0 ? '+' : ''}${stats.profitLoss.toFixed(2)}%`
+• Profit/Loss: ${profitLoss >= 0 ? '+' : ''}${profitLoss.toFixed(2)} (${profitLossPercent.toFixed(2)}%)`
                 });
                 break;
 
@@ -143,6 +147,7 @@
 
             case '/config':
                 const config = $tradingConfig;
+                const params = getTradingParams(config);
                 addMessage({
                     role: 'assistant',
                     content: `⚙️ Trading Configuration:
@@ -150,11 +155,11 @@
 • Risk Level: ${config.risk}
 • Strategy: ${config.strategy}
 • Speed: ${config.speed}
-• Signal Confidence: ${config.signalConfidence}
-• Market Bias: ${config.marketBias}
-• Max Position: ${config.maxPosition}%
-• Stop Loss: ${config.stopLoss}%
-• Take Profit: ${config.takeProfit}%`
+• Signals: ${config.signals}
+• Market Bias: ${config.bias}
+• Max Position: ${((params.maxPositionSize ?? 0) * 100).toFixed(0)}%
+• Stop Loss: ${((params.stopLoss ?? 0) * 100).toFixed(2)}%
+• Take Profit: ${((params.takeProfit ?? 0) * 100).toFixed(2)}%`
                 });
                 break;
 
@@ -260,7 +265,11 @@
                 if (args.length === 0) {
                     const pools = $liquidityPools;
                     const poolList = pools
-                        .map(p => `• ${p.name} (TVL: $${p.tvl.toLocaleString()})`)
+                        .map(p => {
+                            const name = p?.name ?? 'Unknown pool';
+                            const tvl = typeof p?.tvl === 'number' ? p.tvl : 0;
+                            return `• ${name} (TVL: $${tvl.toLocaleString()})`;
+                        })
                         .join('\n');
                     addMessage({
                         role: 'assistant',
@@ -269,7 +278,7 @@
                 } else {
                     const poolName = args.join(' ');
                     const pool = $liquidityPools.find(p =>
-                        p.name.toLowerCase().includes(poolName.toLowerCase())
+                        p?.name?.toLowerCase().includes(poolName.toLowerCase())
                     );
                     if (pool) {
                         selectedPool.set(pool);

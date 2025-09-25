@@ -1,4 +1,4 @@
-import { GSwap, PrivateKeySigner, FEE_TIER, type GalaChainSigner } from '@gala-chain/gswap-sdk';
+import { GSwap, PrivateKeySigner, FEE_TIER, EventSocketClient, type GalaChainSigner } from '@gala-chain/gswap-sdk';
 import type { LiquidityPool, SwapParams } from './types';
 import { CoinGeckoService } from '../services/coingecko';
 import { MetaMaskSigner } from './metamask-signer';
@@ -36,6 +36,7 @@ export class GSwapSDKClient {
   private connected: boolean = false;
   private address: string | null = null;
   private galaChainAddress: string | null = null;
+  private socketClient: EventSocketClient | null = null;
 
   constructor() {
     this.coinGecko = new CoinGeckoService();
@@ -62,17 +63,28 @@ export class GSwapSDKClient {
       // Derive address from private key
       const wallet = new ethers.Wallet(privateKey);
       this.address = wallet.address;
-      this.galaChainAddress = `eth|${this.address.slice(2).toLowerCase()}`;
+      this.galaChainAddress = `eth|${this.address.slice(2)}`; // Match test-swap.js format exactly (no toLowerCase)
 
       console.log('[GSwapSDKClient] Connecting with addresses:');
       console.log('  - Ethereum address:', this.address);
       console.log('  - GalaChain address:', this.galaChainAddress);
 
-      // Create GSwap instance with wallet address
+      // Create GSwap instance with signer and wallet address (just like test-swap.js)
       this.gswap = new GSwap({
         signer: this.signer,
-        walletAddress: this.galaChainAddress,
+        walletAddress: this.galaChainAddress
       });
+      
+      // Initialize socket connection AFTER GSwap (optional, for tracking)
+      try {
+        const bundlerUrl = 'https://bundle-backend-prod1.defi.gala.com';
+        this.socketClient = new EventSocketClient(bundlerUrl);
+        await this.socketClient.connect();
+        console.log('[GSwapSDKClient] ✅ Socket connected to bundler (for tracking)');
+      } catch (socketError) {
+        console.log('[GSwapSDKClient] Socket connection failed (non-critical):', socketError);
+        // Socket is optional, continue without it
+      }
 
       this.connected = true;
       return this.address;
@@ -99,7 +111,7 @@ export class GSwapSDKClient {
 
       // Get address from signer
       this.address = await ethersSigner.getAddress();
-      this.galaChainAddress = `eth|${this.address.slice(2).toLowerCase()}`;
+      this.galaChainAddress = `eth|${this.address.slice(2)}`; // Match test-swap.js format exactly (no toLowerCase)
 
       console.log('[GSwapSDKClient] MetaMask connection:');
       console.log('  - Ethereum address:', this.address);
@@ -108,8 +120,19 @@ export class GSwapSDKClient {
       // Create GSwap instance with MetaMask signer and GalaChain formatted address
       this.gswap = new GSwap({
         signer: this.signer,
-        walletAddress: this.galaChainAddress,
+        walletAddress: this.galaChainAddress
       });
+      
+      // Initialize socket connection AFTER GSwap (optional, for tracking)
+      try {
+        const bundlerUrl = 'https://bundle-backend-prod1.defi.gala.com';
+        this.socketClient = new EventSocketClient(bundlerUrl);
+        await this.socketClient.connect();
+        console.log('[GSwapSDKClient] ✅ Socket connected to bundler (for tracking)');
+      } catch (socketError) {
+        console.log('[GSwapSDKClient] Socket connection failed (non-critical):', socketError);
+        // Socket is optional, continue without it
+      }
 
       this.connected = true;
 
@@ -123,6 +146,11 @@ export class GSwapSDKClient {
   getAddress(): string | null {
     return this.address;
   }
+
+  isConnected(): boolean {
+    return this.connected;
+  }
+
 
   async getBalance(tokenAddress: string, walletAddress: string): Promise<string> {
     if (!this.gswap) {
@@ -176,84 +204,37 @@ export class GSwapSDKClient {
         ? `eth|${walletAddress.slice(2).toLowerCase()}`
         : walletAddress;
 
-      console.log('[GSwapSDKClient] Fetching assets for address:', galaChainAddress);
+      // Silently try to fetch assets - don't log unless successful
       const result = await gswapInstance.assets.getUserAssets(galaChainAddress, 1, 20);
-      console.log('[GSwapSDKClient] Assets fetched:', result);
+      console.log('[GSwapSDKClient] Assets fetched successfully');
       
       // If no tokens, try fetching specific token balances
       if (!result.tokens || result.tokens.length === 0) {
-        console.log('[GSwapSDKClient] No tokens found, trying alternative API');
+        console.log('[GSwapSDKClient] No tokens found, using default balances');
         
-        // Try the direct API endpoint
-        try {
-          const response = await fetch(`https://dex-backend-prod1.defi.gala.com/user/assets?address=${galaChainAddress}&page=1&limit=20`);
-          if (response.ok) {
-            const apiResult = await response.json();
-            if (apiResult.data && apiResult.data.token && apiResult.data.token.length > 0) {
-              console.log('[GSwapSDKClient] Assets found via API:', apiResult.data.token);
-              return {
-                tokens: apiResult.data.token.map((t: any) => ({
-                  symbol: t.symbol,
-                  quantity: t.quantity,
-                  decimals: t.decimals || 8
-                })),
-                count: apiResult.data.token.length
-              };
-            }
-          }
-        } catch (apiError) {
-          console.error('[GSwapSDKClient] API fallback failed:', apiError);
-        }
-        
-        // Try to fetch individual balances for common tokens
-        const commonTokens = ['GALA', 'GWETH', 'GUSDC', 'GUSDT'];
-        const tokens = [];
-        
-        for (const symbol of commonTokens) {
-          try {
-            const balance = await this.getBalance(`${symbol}|Unit|none|none`, walletAddress);
-            if (balance !== '0') {
-              tokens.push({
-                symbol,
-                quantity: balance,
-                decimals: 8
-              });
-            }
-          } catch (e) {
-            console.log(`[GSwapSDKClient] Could not fetch ${symbol} balance:`, e);
-          }
-        }
-        
-        return { tokens, count: tokens.length };
+        // Return default tokens immediately
+        return { 
+          tokens: [
+            { symbol: 'GALA', quantity: '0', decimals: 8 },
+            { symbol: 'GWETH', quantity: '0', decimals: 8 },
+            { symbol: 'GUSDC', quantity: '0', decimals: 8 },
+            { symbol: 'GUSDT', quantity: '0', decimals: 8 }
+          ], 
+          count: 4 
+        };
       }
       
       return result;
-    } catch (error) {
-      console.error('[GSwapSDKClient] Failed to fetch user assets:', error);
-      
-      // Try direct API as last resort
-      try {
-        const galaChainAddress = walletAddress.startsWith('0x')
-          ? `eth|${walletAddress.slice(2).toLowerCase()}`
-          : walletAddress;
-          
-        const response = await fetch(`https://dex-backend-prod1.defi.gala.com/user/assets?address=${galaChainAddress}&page=1&limit=20`);
-        if (response.ok) {
-          const apiResult = await response.json();
-          if (apiResult.data && apiResult.data.token) {
-            return {
-              tokens: apiResult.data.token.map((t: any) => ({
-                symbol: t.symbol,
-                quantity: t.quantity,
-                decimals: t.decimals || 8
-              })),
-              count: apiResult.data.token.length
-            };
-          }
-        }
-      } catch (apiError) {
-        console.error('[GSwapSDKClient] API fallback also failed:', apiError);
+    } catch (error: any) {
+      // Check if this is a 400 error (likely unregistered wallet)
+      if (error?.message?.includes('400') || error?.message?.includes('Bad Request')) {
+        console.log('[GSwapSDKClient] Wallet not found on GalaChain, using default balances');
+      } else if (error?.message && !error.message.includes('fetch')) {
+        // Only log non-network errors
+        console.warn('[GSwapSDKClient] Error fetching assets:', error.message);
       }
+      
+      // Don't try the API fallback again to avoid duplicate 400 errors
       
       // Return default tokens with 0 balance
       return { 
@@ -386,8 +367,18 @@ export class GSwapSDKClient {
   }
 
   async executeSwap(params: SwapParams): Promise<string> {
+    console.log('[GSwapSDKClient] executeSwap called');
+    console.log('[GSwapSDKClient] Connected?', this.connected);
+    console.log('[GSwapSDKClient] Has GSwap?', !!this.gswap);
+    console.log('[GSwapSDKClient] Has signer?', !!this.signer);
+    console.log('[GSwapSDKClient] Address:', this.address);
+    
+    if (!this.connected) {
+      throw new Error('GSwapSDKClient not connected. Call connect() first.');
+    }
+    
     if (!this.gswap) {
-      throw new Error('GSwap not connected');
+      throw new Error('GSwap instance not initialized');
     }
 
     try {
@@ -413,18 +404,47 @@ export class GSwapSDKClient {
 
       // Get quote first
       console.log('💱 Getting quote from GSwap...');
-      const quote = await this.gswap.quoting.quoteExactInput(
-        tokenIn,
-        tokenOut,
-        amountIn
-      );
+      console.log('  - Token In:', tokenIn);
+      console.log('  - Token Out:', tokenOut);
+      console.log('  - Amount In:', amountIn);
+      console.log('  - GSwap instance:', this.gswap);
+      console.log('  - Signer type:', this.signer?.constructor.name);
+      console.log('  - GalaChain address:', this.galaChainAddress);
+      console.log('  - Connected?:', this.connected);
+      
+      // Small delay to ensure GSwap is ready (might help with 409 conflicts)
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Log the actual request that will be sent
+      console.log('  - About to call quoteExactInput with:', { tokenIn, tokenOut, amountIn });
+      
+      let quote;
+      try {
+        quote = await this.gswap.quoting.quoteExactInput(
+          tokenIn,
+          tokenOut,
+          amountIn
+        );
+      } catch (quoteError: any) {
+        console.error('Quote failed:', quoteError);
+        console.error('Quote error response:', quoteError.response);
+        console.error('Quote error data:', quoteError.response?.data);
+        console.error('Quote error status:', quoteError.response?.status);
+        console.error('Quote error details:', quoteError.details);
+        
+        // Try to extract more details from the error
+        if (quoteError.response?.data) {
+          console.error('Server response data:', JSON.stringify(quoteError.response.data, null, 2));
+        }
+        
+        throw new Error(`Failed to get quote: ${quoteError.message || 'Unknown error'}`);
+      }
 
       console.log('📈 Quote received:', {
         outAmount: quote.outTokenAmount.toNumber(),
         price: quote.currentPrice,
         priceImpact: quote.priceImpact,
         feeTier: quote.feeTier,
-        fee: quote.fee
       });
 
       // Calculate minimum output with slippage
@@ -474,7 +494,6 @@ export class GSwapSDKClient {
         {                  // amount object
           exactIn: amountIn,
           amountOutMinimum: minAmountOut,
-          deadline: Math.floor(Date.now() / 1000) + 300
         },
         recipient          // walletAddress (GalaChain format)
       );
@@ -485,13 +504,14 @@ export class GSwapSDKClient {
       
       // Log all properties of swapResult to find the blockchain hash
       console.log('🔍 Swap result properties:', Object.keys(swapResult));
+      const swapResultDetails = swapResult as unknown as Record<string, unknown>;
       console.log('🔍 Swap result details:', {
-        transactionId: swapResult.transactionId,
-        transactionHash: swapResult.transactionHash,
-        hash: swapResult.hash,
-        txHash: swapResult.txHash,
-        message: swapResult.message,
-        error: swapResult.error
+        transactionId: swapResultDetails.transactionId,
+        transactionHash: swapResultDetails.transactionHash,
+        hash: swapResultDetails.hash,
+        txHash: swapResultDetails.txHash,
+        message: swapResultDetails.message,
+        error: swapResultDetails.error
       });
       
       console.log('⏳ Waiting for blockchain confirmation...');
@@ -501,20 +521,38 @@ export class GSwapSDKClient {
         const txId = (swapResult as any).transactionId;
         console.log('📝 Transaction submitted with ID:', txId);
         
-        // Note: waitDelegate() requires socket connection which we don't have
-        // The transaction IS submitted to the blockchain successfully
-        // We just can't get the blockchain hash without socket connection
+        // Try to get blockchain hash if socket is connected
+        if (this.socketClient && this.socketClient.isConnected()) {
+          console.log('🔌 Socket connected, attempting to get blockchain hash...');
+          try {
+            const confirmedTx = await (swapResult as any).waitDelegate();
+            console.log('✅ Transaction confirmed!', confirmedTx);
+            
+            // Extract the blockchain transaction hash
+            const txHash = confirmedTx?.transactionHash || 
+                          confirmedTx?.hash || 
+                          confirmedTx?.txHash ||
+                          confirmedTx?.Data?.TransactionId ||
+                          confirmedTx?.id;
+                          
+            if (txHash && txHash !== txId) {
+              console.log('🎉 Got blockchain hash:', txHash);
+              console.log('🔗 View on GalaScan: https://galascan.gala.com/transaction/' + txHash);
+              return txHash;
+            }
+          } catch (waitError: any) {
+            console.warn('Could not get blockchain hash:', waitError.message);
+          }
+        } else {
+          console.log('⚠️ Socket not connected - cannot get blockchain hash');
+        }
         
-        // For now, return the transaction ID
-        // In production, you'd want to set up socket connection or poll for status
+        // Fallback to transaction ID
         console.log('✅ Trade submitted to GalaChain successfully');
         console.log('ℹ️ Transaction ID:', txId);
         console.log('📌 Transaction Status: PENDING (processing on blockchain)');
         console.log('⏱️ Confirmation: ~5-10 seconds for blockchain processing');
-        console.log('💡 Tip: Run "node check-balances.js" to verify trade completion');
         
-        // The transaction IS real and WILL execute on the blockchain
-        // We just can't track it in real-time without socket connection
         return txId || `pending-${Date.now()}`;
       }
 

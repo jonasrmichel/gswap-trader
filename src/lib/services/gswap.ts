@@ -5,12 +5,26 @@ import { get } from 'svelte/store';
 // Singleton GSwap client instance
 let gswapClient: GSwapSDKClient | null = null;
 
+let connectionPromise: Promise<void> | null = null;
+
 export function getGSwapClient(): GSwapSDKClient {
   if (!gswapClient) {
     gswapClient = new GSwapSDKClient();
     
+    // Auto-connect with env private key if available
+    const envPrivateKey = import.meta.env.VITE_WALLET_PRIVATE_KEY;
+    
     // Subscribe to wallet changes and update the signer
+    // BUT: Don't override if we're using a private key connection
     walletStore.subscribe(async (state) => {
+      // Check if we already have a private key connection
+      const hasPrivateKeyConnection = envPrivateKey && envPrivateKey !== '' && gswapClient?.isConnected();
+      
+      if (hasPrivateKeyConnection) {
+        console.log('[GSwap Service] Using private key connection, ignoring wallet changes');
+        return; // Don't override private key connection
+      }
+      
       if (state.connected && state.signer) {
         console.log('[GSwap Service] Wallet connected, setting signer');
         await gswapClient?.setSigner(state.signer);
@@ -19,18 +33,27 @@ export function getGSwapClient(): GSwapSDKClient {
         await gswapClient.setSigner(null);
       }
     });
-
-    // Auto-connect with env private key if available
-    const envPrivateKey = import.meta.env.VITE_WALLET_PRIVATE_KEY;
     if (envPrivateKey && envPrivateKey !== '') {
       console.log('[GSwap Service] Found env private key, auto-connecting');
-      gswapClient.connect(envPrivateKey).catch(error => {
-        console.error('[GSwap Service] Failed to connect with env private key:', error);
-      });
+      // Store the connection promise so we can await it
+      connectionPromise = gswapClient.connect(envPrivateKey)
+        .then(address => {
+          console.log('[GSwap Service] ✅ Connected with private key! Address:', address);
+        })
+        .catch(error => {
+          console.error('[GSwap Service] Failed to connect with env private key:', error);
+          throw error;
+        });
     }
   }
   
   return gswapClient;
+}
+
+export async function waitForConnection(): Promise<void> {
+  if (connectionPromise) {
+    await connectionPromise;
+  }
 }
 
 export async function initializeGSwap(): Promise<void> {

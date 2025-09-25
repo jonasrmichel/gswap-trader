@@ -4,6 +4,8 @@
   import type { LiquidityPool } from '$lib/gswap/types';
   import { getGSwapClient, initializeGSwap } from '$lib/services/gswap';
   import type { GSwapSDKClient } from '$lib/gswap/gswap-sdk-client';
+  import { poolHistory, poolHistoryMap } from '$lib/stores/pools';
+  import type { PoolPriceHistory } from '$lib/data/historical-prices';
 
   let searchQuery = '';
   let filteredPools: LiquidityPool[] = [];
@@ -69,6 +71,9 @@
 
     // Try to update pools
     await updatePools();
+    
+    // Load historical price data
+    await poolHistory.load();
 
     // Update prices every 60 seconds
     priceUpdateInterval = window.setInterval(() => {
@@ -140,13 +145,31 @@
             <span class="px-2 py-0.5 text-xs rounded-full bg-accent/20 text-accent">
               {(pool.fee * 100).toFixed(2)}% fee
             </span>
-            {#if pool.tvl > 1000000}
+            {#if typeof pool.tvl === 'number' && pool.tvl > 1000000}
               <span class="px-2 py-0.5 text-xs rounded-full bg-success/20 text-success">
                 High Liquidity
               </span>
             {/if}
           </div>
           <div class="flex items-center gap-3">
+            <!-- 24h Price Change -->
+            {#if $poolHistoryMap.get(pool.id)}
+              {@const history = $poolHistoryMap.get(pool.id)}
+              {#if history?.priceChange24h !== undefined}
+                <div class="flex items-center gap-1 text-sm {history.priceChange24h >= 0 ? 'text-success' : 'text-error'}">
+                  {#if history.priceChange24h >= 0}
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+                    </svg>
+                  {:else}
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                  {/if}
+                  <span>{Math.abs(history.priceChange24h).toFixed(2)}%</span>
+                </div>
+              {/if}
+            {/if}
             <div class="text-sm">
               {#if pool.priceTokenA && pool.priceTokenB}
                 <div class="flex items-center gap-2">
@@ -171,14 +194,16 @@
         <div class="grid grid-cols-3 gap-3 text-sm">
           <div>
             <div class="text-muted text-xs">TVL</div>
-            <div class="font-medium">${formatNumber(pool.tvl || 0)}</div>
+            <div class="font-medium">${formatNumber(pool.tvl ?? 0)}</div>
             {#if pool.lastUpdated}
               <div class="text-xs text-success mt-0.5">Live</div>
             {/if}
           </div>
           <div>
             <div class="text-muted text-xs">24h Volume</div>
-            <div class="font-medium">${formatNumber(pool.volume24h || 0)}</div>
+            <div class="font-medium">
+              ${formatNumber($poolHistoryMap.get(pool.id)?.volume24h || pool.volume24h || 0)}
+            </div>
           </div>
           <div>
             <div class="text-muted text-xs">Reserves</div>

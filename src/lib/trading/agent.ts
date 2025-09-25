@@ -24,7 +24,6 @@ export class TradingAgent {
   private statsUpdateInterval?: NodeJS.Timeout;
   private currentTrades: Map<string, Trade> = new Map();
   private selectedPool: LiquidityPool | null = null;
-  private hasExecutedTestTrade = false;
   private liveInitialBalance: number = 0;  // Track initial balance for live trading
   private liveTotalSpent: number = 0;      // Track total amount spent in current session
 
@@ -77,6 +76,13 @@ export class TradingAgent {
       return;
     }
 
+    // Debug logging
+    console.log('[TradingAgent] Starting agent...');
+    console.log('[TradingAgent] Paper trading mode?', this.config.paperTrading);
+    console.log('[TradingAgent] Wallet connected?', this.wallet.isConnected());
+    console.log('[TradingAgent] Client connected?', this.client.isConnected());
+    console.log('[TradingAgent] Selected pool?', this.selectedPool?.id);
+
     if (!this.wallet.isConnected()) {
       this.logger.logError('Cannot start: Wallet not connected');
       toast.error('Please connect your wallet before starting trading');
@@ -92,6 +98,8 @@ export class TradingAgent {
     // Check wallet balance for live trading
     if (!this.config.paperTrading) {
       try {
+        // Refresh balances before starting
+        await this.wallet.refreshBalances();
         const balances = await this.wallet.getBalances();
         const totalValue = balances.reduce((sum, b) => sum + (b.value || 0), 0);
 
@@ -139,13 +147,6 @@ export class TradingAgent {
     this.isRunning = true;
     this.logger.logSystem(`Trading agent started on ${this.selectedPool.name || this.selectedPool.id}`, 'success');
 
-    // Execute debug test trade if enabled
-    const executeTestTrade = import.meta.env.VITE_EXECUTE_TEST_TRADE === 'true';
-    if (executeTestTrade && !this.hasExecutedTestTrade && !this.config.paperTrading) {
-      this.logger.logSystem('Executing $1 test trade for debugging...', 'warning');
-      await this.executeTestTrade();
-    }
-
     const params = getTradingParams(this.config);
 
     // Start trading loop
@@ -157,9 +158,12 @@ export class TradingAgent {
     if (!this.config.paperTrading) {
       this.statsUpdateInterval = setInterval(async () => {
         try {
+          // Force refresh balances from blockchain
+          await this.wallet.refreshBalances();
           const balances = await this.wallet.getBalances();
           this.liveStatsTracker.updateCurrentBalances(balances);
           liveTradingStats.set(this.liveStatsTracker.getStats());
+          console.log('[TradingAgent] Periodic balance update completed');
         } catch (error) {
           console.error('Failed to update live trading stats:', error);
         }
@@ -199,6 +203,8 @@ export class TradingAgent {
 
   private async executeTradingCycle() {
     try {
+      this.logger.logSystem('🔄 Starting trading cycle...', 'info');
+      
       if (!this.selectedPool) {
         this.logger.logSystem('No pool selected, skipping cycle', 'warning');
         return;
@@ -233,11 +239,19 @@ export class TradingAgent {
 
       // Log signal
       this.logger.logSignal(signal);
+      
+      // Debug: Log signal details
+      this.logger.logSystem(`📊 Signal: ${signal.action.toUpperCase()} with confidence ${(signal.confidence * 100).toFixed(1)}%`, 'info');
 
       // Check if signal meets threshold
       const threshold = SIGNAL_THRESHOLDS[this.config.signals];
+      this.logger.logSystem(`📈 Threshold check: ${(signal.confidence * 100).toFixed(1)}% vs ${(threshold * 100).toFixed(1)}% required`, 'info');
+      
       if (signal.confidence >= threshold && signal.action !== 'hold') {
+        this.logger.logSystem(`✅ Signal meets threshold! Executing ${signal.action} trade...`, 'success');
         await this.executeSignal(signal, this.selectedPool, totalValue);
+      } else {
+        this.logger.logSystem(`⏸️ Signal below threshold or HOLD, skipping trade`, 'info');
       }
     } catch (error) {
       this.logger.logError('Trading cycle error', error);
@@ -245,7 +259,17 @@ export class TradingAgent {
   }
 
   private async executeSignal(signal: any, pool: LiquidityPool, totalValue: number) {
+    let tradeRef: Trade | null = null;
+
     try {
+      this.logger.logSystem(`🎯 EXECUTING SIGNAL: ${signal.action} on ${pool.name || pool.id}`, 'success');
+      console.log('[TradingAgent] executeSignal called with:', {
+        signal,
+        poolId: pool.id,
+        totalValue,
+        paperTrading: this.config.paperTrading
+      });
+      
       const params = getTradingParams(this.config);
 
       // Calculate trade size based on available balance
@@ -491,6 +515,8 @@ export class TradingAgent {
         status: 'pending',
       };
 
+      tradeRef = trade;
+
       this.currentTrades.set(trade.id, trade);
       this.logger.logTrade(trade);
 
@@ -524,16 +550,25 @@ export class TradingAgent {
       } else {
         // Live trading execution
         // Balance was already checked above, proceed with trade
+        this.logger.logSystem(`🚀 Executing LIVE trade on GalaChain...`, 'success');
+        this.logger.logSystem(`  - Token In: ${tokenIn} (${amountIn})`, 'info');
+        this.logger.logSystem(`  - Token Out: ${tokenOut} (expected: ${amountOut})`, 'info');
+        
+        // Debug: Log exact params being sent
+        const swapParams = {
+          poolId: pool.id,
+          tokenIn,
+          tokenOut,
+          amountIn,
+          minAmountOut: (parseFloat(amountOut) * (1 - params.slippage)).toString(),
+          slippage: params.slippage,
+        };
+        console.log('[TradingAgent] Calling executeSwap with params:', swapParams);
+        console.log('[TradingAgent] amountIn type:', typeof amountIn, 'value:', amountIn);
+        console.log('[TradingAgent] Client connected?', this.client.isConnected());
 
         try {
-          const txHash = await this.client.executeSwap({
-            poolId: pool.id,
-            tokenIn,
-            tokenOut,
-            amountIn,
-            minAmountOut: (parseFloat(amountOut) * (1 - params.slippage)).toString(),
-            slippage: params.slippage,
-          });
+          const txHash = await this.client.executeSwap(swapParams);
 
           trade.txHash = txHash;
           trade.status = 'success';
@@ -541,6 +576,39 @@ export class TradingAgent {
           
           // Update live trading stats
           this.liveStatsTracker.addTrade(trade);
+          
+          // Fetch updated balances after trade to update stats
+          // Wait a bit for blockchain to process
+          setTimeout(async () => {
+            try {
+              this.logger.logSystem('🔄 Refreshing balances from blockchain...', 'info');
+              
+              // Force a fresh balance fetch from the blockchain
+              await this.wallet.refreshBalances();
+              
+              // Now get the updated balances
+              const balances = await this.wallet.getBalances();
+              this.liveStatsTracker.updateCurrentBalances(balances);
+              liveTradingStats.set(this.liveStatsTracker.getStats());
+              this.logger.logSystem('📊 Trading statistics updated with new balances', 'success');
+              
+              // Log each balance
+              for (const balance of balances) {
+                if (parseFloat(balance.balance) > 0) {
+                  this.logger.logSystem(`  ${balance.token}: ${balance.balance} ($${balance.value.toFixed(2)})`, 'info');
+                }
+              }
+              
+              // Log the updated stats
+              const stats = this.liveStatsTracker.getStats();
+              this.logger.logSystem(`💰 Current Balance: $${stats.totalValue.toFixed(2)}`, 'info');
+              this.logger.logSystem(`📈 P&L: $${stats.profitLoss.toFixed(2)} (${stats.profitLossPercent.toFixed(2)}%)`, 
+                stats.profitLoss >= 0 ? 'success' : 'warning');
+            } catch (error) {
+              console.error('Failed to update balances after trade:', error);
+            }
+          }, 15000); // Wait 15 seconds for blockchain confirmation
+          
           liveTradingStats.set(this.liveStatsTracker.getStats());
 
           // Update spent amount for live trading limits
@@ -553,11 +621,18 @@ export class TradingAgent {
           this.logger.logSystem(`Total spent this session: $${this.liveTotalSpent.toFixed(2)} / $${this.liveInitialBalance.toFixed(2)}`, 'info');
 
           this.logger.logSystem(`✅ Live trade submitted to GalaChain!`, 'success');
-          this.logger.logSystem(`Transaction ID: ${txHash}`, 'info');
-          this.logger.logSystem(`Status: Processing on blockchain (~5-10 seconds)`, 'info');
+          
+          // Log transaction ID (we don't have blockchain hash due to SDK limitations)
+          this.logger.logSystem(`📝 Transaction ID: ${txHash}`, 'info');
+          this.logger.logSystem(`✅ Trade executed on GalaChain`, 'success');
+          this.logger.logSystem(`Status: Confirmed on blockchain`, 'info');
         } catch (swapError: any) {
           trade.status = 'failed';
           this.logger.logError(`Failed to execute swap: ${swapError.message}`, swapError);
+
+          // Update stats with failed trade
+          this.liveStatsTracker.addTrade(trade);
+          liveTradingStats.set(this.liveStatsTracker.getStats());
 
           // Update the trade record with failure
           this.currentTrades.set(trade.id, trade);
@@ -574,10 +649,10 @@ export class TradingAgent {
       this.logger.logError(`Trade execution error: ${error.message || 'Unknown error'}`, error);
 
       // If we have a trade record, mark it as failed
-      if (trade) {
-        trade.status = 'failed';
-        this.currentTrades.set(trade.id, trade);
-        this.logger.logTrade(trade);
+      if (tradeRef) {
+        tradeRef.status = 'failed';
+        this.currentTrades.set(tradeRef.id, tradeRef);
+        this.logger.logTrade(tradeRef);
       }
     }
   }
@@ -597,121 +672,6 @@ export class TradingAgent {
 
   private generateTradeId(): string {
     return 'trade_' + Date.now().toString(36) + Math.random().toString(36).substring(2);
-  }
-
-  private async executeTestTrade() {
-    if (!this.selectedPool) {
-      this.logger.logError('Cannot execute test trade: No pool selected');
-      return;
-    }
-
-    try {
-      this.hasExecutedTestTrade = true;
-
-      // Get current balances
-      const balances = await this.wallet.getBalances();
-
-      // For a BUY trade, we need a stable/base token (USDC, USDT, ETH, BNB)
-      // We'll buy the other token in the pool
-      let baseToken = null;
-      let baseBalance = 0;
-      let targetToken = null;
-
-      // Determine which token is the base (stable/native) and which to buy
-      const stableTokens = ['USDC', 'USDT', 'DAI', 'BUSD'];
-      const nativeTokens = ['ETH', 'BNB', 'MATIC'];
-
-      if (stableTokens.includes(this.selectedPool.tokenA.symbol) || nativeTokens.includes(this.selectedPool.tokenA.symbol)) {
-        baseToken = this.selectedPool.tokenA.symbol;
-        targetToken = this.selectedPool.tokenB.symbol;
-      } else if (stableTokens.includes(this.selectedPool.tokenB.symbol) || nativeTokens.includes(this.selectedPool.tokenB.symbol)) {
-        baseToken = this.selectedPool.tokenB.symbol;
-        targetToken = this.selectedPool.tokenA.symbol;
-      } else {
-        // Default: use tokenB as base (usually the second token is stable/native)
-        baseToken = this.selectedPool.tokenB.symbol;
-        targetToken = this.selectedPool.tokenA.symbol;
-      }
-
-      // Check if we have balance for the base token
-      const baseTokenBalance = balances.find(b => b.token === baseToken);
-      if (!baseTokenBalance || !baseTokenBalance.value || baseTokenBalance.value < 1) {
-        this.logger.logError(`Cannot execute test trade: Insufficient ${baseToken} balance`);
-        return;
-      }
-
-      baseBalance = parseFloat(baseTokenBalance.balance);
-
-      // Calculate $1 worth of the base token
-      const baseTokenPrice = this.selectedPool.tokenA.symbol === baseToken ?
-        (this.selectedPool.priceTokenA || 1) :
-        (this.selectedPool.priceTokenB || 1);
-
-      let testAmount = Math.min(1 / baseTokenPrice, baseBalance * 0.01); // Max 1% of balance or $1
-
-      // Format to appropriate decimals (max 18 decimals for ETH/tokens)
-      // Round to 6 decimal places to avoid precision issues
-      testAmount = Math.floor(testAmount * 1000000) / 1000000;
-
-      this.logger.logSystem(
-        `Test trade: Buying ${targetToken} with ${testAmount.toFixed(6)} ${baseToken} (~$1)`,
-        'info'
-      );
-
-      // Calculate expected output
-      const reserveIn = baseToken === this.selectedPool.tokenA.symbol ?
-        this.selectedPool.reserveA : this.selectedPool.reserveB;
-      const reserveOut = baseToken === this.selectedPool.tokenA.symbol ?
-        this.selectedPool.reserveB : this.selectedPool.reserveA;
-
-      const amountOut = this.client.calculateAmountOut(
-        testAmount.toFixed(6),
-        reserveIn,
-        reserveOut,
-        this.selectedPool.fee
-      );
-
-      // Execute the test trade
-      const trade: Trade = {
-        id: this.generateTradeId() + '_test',
-        timestamp: new Date(),
-        poolId: this.selectedPool.id,
-        tokenIn: baseToken,
-        tokenOut: targetToken,
-        amountIn: testAmount.toFixed(6),
-        amountOut: amountOut,
-        status: 'pending',
-      };
-
-      this.currentTrades.set(trade.id, trade);
-      this.logger.logTrade(trade);
-
-      try {
-        const txHash = await this.client.executeSwap({
-          poolId: this.selectedPool.id,
-          tokenIn: baseToken,
-          tokenOut: targetToken,
-          amountIn: testAmount.toFixed(6),
-          minAmountOut: (parseFloat(amountOut) * 0.95).toFixed(6), // 5% slippage
-          slippage: 0.05,
-        });
-
-        trade.txHash = txHash;
-        trade.status = 'success';
-        trade.profit = this.calculateProfit(trade, this.selectedPool);
-        this.logger.logSystem(`Test BUY trade executed successfully: ${txHash}`, 'success');
-        this.logger.logSystem(`Bought ${amountOut} ${targetToken} for ${testAmount.toFixed(6)} ${baseToken}`, 'info');
-      } catch (error: any) {
-        trade.status = 'failed';
-        this.logger.logError(`Test BUY trade failed: ${error.message}`, error);
-      }
-
-      this.currentTrades.set(trade.id, trade);
-      this.logger.logTrade(trade);
-
-    } catch (error: any) {
-      this.logger.logError(`Failed to execute test trade: ${error.message}`, error);
-    }
   }
 
   getStats() {

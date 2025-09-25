@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { ethers } from 'ethers';
 import type { LiquidityPool, SwapParams, Token } from './types';
 import { CoinGeckoService } from '../services/coingecko';

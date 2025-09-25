@@ -22,7 +22,7 @@
   } from '$lib/stores/trading';
   // GSwapClient removed - using GSwap SDK exclusively for GalaChain
   import type { GSwapSDKClient } from '$lib/gswap/gswap-sdk-client';
-  import { getGSwapClient, initializeGSwap } from '$lib/services/gswap';
+  import { getGSwapClient, initializeGSwap, waitForConnection } from '$lib/services/gswap';
   import { WalletManager } from '$lib/wallet/manager';
   import { TradingAgent } from '$lib/trading/agent';
   import { TradingLogger } from '$lib/trading/logger';
@@ -35,72 +35,100 @@
   let logger: TradingLogger | null = null;
   let paperManager: PaperTradingManager | null = null;
 
-  onMount(async () => {
-    // Initialize wallet service (will auto-connect if env key is set)
-    await initializeWallet();
+  onMount(() => {
+    let unsubscribe: (() => void) | undefined;
+    let statsInterval: ReturnType<typeof setInterval> | undefined;
+    let autoStartInterval: ReturnType<typeof setInterval> | undefined;
+    let autoStartTimeout: ReturnType<typeof setTimeout> | undefined;
 
-    // Use shared GSwap SDK client for GalaChain trading
-    console.log('Getting shared GSwap SDK client for GalaChain trading');
-    client = getGSwapClient();
-    
-    // Initialize GSwap with current wallet state
-    await initializeGSwap();
+    (async () => {
+      // Initialize wallet service (will auto-connect if env key is set)
+      await initializeWallet();
 
-    wallet = new WalletManager(client);
-    logger = new TradingLogger();
-    paperManager = new PaperTradingManager($initialBalance);
+      // Use shared GSwap SDK client for GalaChain trading
+      console.log('Getting shared GSwap SDK client for GalaChain trading');
+      client = getGSwapClient();
 
-    // Subscribe to logger updates
-    const unsubscribe = logger.subscribe((log) => {
-      tradingLogs.update(logs => [log, ...logs].slice(0, 100));
-      tradingStats.set(logger.getStats());
-    });
+      // Initialize GSwap with current wallet state
+      await initializeGSwap();
 
-    // Update paper trading stats periodically
-    const statsInterval = setInterval(() => {
-      if (paperManager) {
-        paperTradingStats.set(paperManager.getStats());
-      }
-    }, 1000); // Update every second
+      // Wait for connection to complete
+      await waitForConnection();
+      console.log('[+page] Client connected?', client?.isConnected());
 
-    // Simulate some initial logs
-    logger.logSystem('GSwap Trader initialized', 'success');
-    logger.logSystem('Connected to GalaChain network');
+      wallet = new WalletManager(client);
+      logger = new TradingLogger();
+      paperManager = new PaperTradingManager($initialBalance);
 
-    // Apply default settings from env
-    if (import.meta.env.VITE_DEFAULT_PAPER_TRADING !== undefined) {
-      const paperMode = import.meta.env.VITE_DEFAULT_PAPER_TRADING === 'true';
-      tradingConfig.update(config => ({ ...config, paperTrading: paperMode }));
-      logger.logSystem(`Default trading mode set to: ${paperMode ? 'Paper' : 'Live'}`, 'info');
-    }
+      // Subscribe to logger updates
+      const activeLogger = logger;
+      unsubscribe = activeLogger.subscribe((log) => {
+        tradingLogs.update(logs => [log, ...logs].slice(0, 100));
+        tradingStats.set(activeLogger.getStats());
+      });
 
-    // Check for auto-start trading
-    if (import.meta.env.VITE_AUTO_START_TRADING === 'true' && import.meta.env.VITE_WALLET_PRIVATE_KEY) {
-      logger.logSystem('Auto-start trading enabled, waiting for wallet connection...', 'info');
-
-      // Wait for wallet to connect and agent to be ready
-      const checkInterval = setInterval(async () => {
-        if ($isWalletConnected && agent && !$tradingActive) {
-          clearInterval(checkInterval);
-          logger.logSystem('Auto-starting trading from environment configuration', 'info');
-
-          try {
-            await agent.start();
-            tradingActive.set(true);
-            logger.logSystem('Trading started automatically', 'success');
-          } catch (error) {
-            logger.logError('Failed to auto-start trading', error);
-          }
+      // Update paper trading stats periodically
+      statsInterval = setInterval(() => {
+        if (paperManager) {
+          paperTradingStats.set(paperManager.getStats());
         }
-      }, 1000); // Check every second
+      }, 1000); // Update every second
 
-      // Clean up interval after 30 seconds if not connected
-      setTimeout(() => clearInterval(checkInterval), 30000);
-    }
+      // Simulate some initial logs
+      logger.logSystem('GSwap Trader initialized', 'success');
+      logger.logSystem('Connected to GalaChain network');
+
+      // Apply default settings from env
+      if (import.meta.env.VITE_DEFAULT_PAPER_TRADING !== undefined) {
+        const paperMode = import.meta.env.VITE_DEFAULT_PAPER_TRADING === 'true';
+        tradingConfig.update(config => ({ ...config, paperTrading: paperMode }));
+        logger.logSystem(`Default trading mode set to: ${paperMode ? 'Paper' : 'Live'}`, 'info');
+      }
+
+      // Check for auto-start trading
+      if (import.meta.env.VITE_AUTO_START_TRADING === 'true' && import.meta.env.VITE_WALLET_PRIVATE_KEY) {
+        logger.logSystem('Auto-start trading enabled, waiting for wallet connection...', 'info');
+
+        // Wait for wallet to connect and agent to be ready
+        autoStartInterval = setInterval(async () => {
+          if ($isWalletConnected && agent && !$tradingActive) {
+            if (autoStartInterval) {
+              clearInterval(autoStartInterval);
+              autoStartInterval = undefined;
+            }
+            logger?.logSystem('Auto-starting trading from environment configuration', 'info');
+
+            try {
+              await agent.start();
+              tradingActive.set(true);
+              logger?.logSystem('Trading started automatically', 'success');
+            } catch (error) {
+              logger?.logError('Failed to auto-start trading', error);
+            }
+          }
+        }, 1000); // Check every second
+
+        // Clean up interval after 30 seconds if not connected
+        autoStartTimeout = setTimeout(() => {
+          if (autoStartInterval) {
+            clearInterval(autoStartInterval);
+            autoStartInterval = undefined;
+          }
+        }, 30000);
+      }
+    })();
 
     return () => {
-      unsubscribe();
-      clearInterval(statsInterval);
+      unsubscribe?.();
+      if (statsInterval) {
+        clearInterval(statsInterval);
+      }
+      if (autoStartInterval) {
+        clearInterval(autoStartInterval);
+      }
+      if (autoStartTimeout) {
+        clearTimeout(autoStartTimeout);
+      }
       if (agent?.isActive()) {
         agent.stop();
       }
@@ -176,7 +204,9 @@
     {/if}
 
     <!-- Trading Controls -->
-    <TradingControls {agent} {logger} />
+    {#if logger}
+      <TradingControls {agent} {logger} />
+    {/if}
 
     <!-- Wallet Balance and Trading Configuration -->
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
