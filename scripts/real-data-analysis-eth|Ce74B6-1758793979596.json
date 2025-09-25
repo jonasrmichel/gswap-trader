@@ -1,0 +1,25 @@
+{
+  "wallet": "eth|Ce74B68cd1e9786F4BD3b9f7152D6151695A0bA5",
+  "analysisDate": "2025-09-25T09:52:59.596Z",
+  "startDate": "2025-09-23T00:00:00.000Z",
+  "realData": {
+    "balances": {},
+    "prices": {
+      "GALA": 0.01489055,
+      "GWETH": 4031.03,
+      "ETH": 4031.03,
+      "GUSDC": 0.999713,
+      "USDC": 0.999713,
+      "GUSDT": 1,
+      "USDT": 1
+    },
+    "transactions": [],
+    "statistics": {}
+  },
+  "metadata": {
+    "note": "This analysis contains only real fetched data, no estimates or calculations",
+    "balanceSource": "GalaChain DEX API",
+    "priceSource": "CoinGecko API",
+    "transactionSource": "unavailable"
+  }
+}

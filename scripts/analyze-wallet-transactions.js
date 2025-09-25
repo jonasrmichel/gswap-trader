@@ -162,7 +162,7 @@ class ComprehensiveWalletAnalyzer {
     // Calculate estimated volume moved for each token
     console.log('📊 ESTIMATED VOLUME MOVED');
     console.log('─'.repeat(70));
-    console.log('Token     Current Hold    Est. Volume    Turnover   USD Value');
+    console.log('Token     Current Hold    Est. Volume    Method      USD Value');
     console.log('─'.repeat(70));
     
     let totalVolumeMoved = 0;
@@ -170,28 +170,40 @@ class ComprehensiveWalletAnalyzer {
     const volumeData = [];
     
     for (const holding of holdings) {
-      // Estimate volume moved based on current holdings and token type
-      let volumeMultiplier = 1;
-      let turnoverRatio = 0;
+      // More realistic volume estimation based on trading patterns
+      let estimatedVolume = 0;
+      let calculationMethod = '';
       
       if (holding.token === 'GALA') {
-        // Primary trading token - higher volume
-        volumeMultiplier = 3;
+        // For primary token, estimate based on likely trading activity
+        // Assume day trader might move 10-20% of position per trade, 5-10 trades
+        const avgTradeSize = holding.quantity * 0.15; // 15% of position
+        const estimatedTrades = 8; // Reasonable number of trades
+        estimatedVolume = avgTradeSize * estimatedTrades;
+        calculationMethod = 'Trading';
       } else if (holding.token === 'GWETH' || holding.token === 'GUSDC') {
-        // Secondary tokens - moderate volume  
-        volumeMultiplier = 2;
+        // For small holdings, these might be fees or residuals
+        // Volume is likely much higher than current holding
+        if (holding.quantity < 0.001) {
+          // Tiny amounts suggest these are leftovers from larger trades
+          estimatedVolume = holding.quantity * 100; // Was part of larger trades
+          calculationMethod = 'Residual';
+        } else {
+          estimatedVolume = holding.quantity * 5; // Normal trading
+          calculationMethod = 'Trading';
+        }
       } else if (holding.token === 'GUSDT') {
-        // Stablecoin - moderate volume
-        volumeMultiplier = 2.5;
+        // Stablecoin - often used for parking funds
+        estimatedVolume = holding.quantity * 4;
+        calculationMethod = 'Stable';
       } else {
-        // Other tokens - lower volume
-        volumeMultiplier = 1.5;
+        // Other tokens
+        estimatedVolume = holding.quantity * 2;
+        calculationMethod = 'Default';
       }
       
-      // Calculate estimated volume moved
-      const estimatedVolume = holding.quantity * volumeMultiplier;
+      // Calculate USD value of volume
       const volumeValue = estimatedVolume * holding.price;
-      turnoverRatio = volumeMultiplier;
       totalVolumeMoved += volumeValue;
       totalTokensMoved += estimatedVolume;
       
@@ -200,7 +212,7 @@ class ComprehensiveWalletAnalyzer {
         currentHolding: holding.quantity,
         estimatedVolume,
         volumeValue,
-        turnoverRatio
+        calculationMethod
       });
       
       // Format the output
@@ -210,13 +222,13 @@ class ComprehensiveWalletAnalyzer {
       
       const volumeStr = estimatedVolume < 1
         ? estimatedVolume.toExponential(2)
-        : estimatedVolume.toFixed(2);
+        : estimatedVolume.toLocaleString(undefined, {maximumFractionDigits: 2});
       
       console.log(
         `${holding.token.padEnd(10)}` +
         `${quantityStr.padStart(14)} ` +
         `${volumeStr.padStart(14)} ` +
-        `${turnoverRatio.toFixed(1).padStart(10)}x` +
+        `${calculationMethod.padStart(10)}` +
         `  $${volumeValue.toFixed(2).padStart(10)}`
       );
     }
@@ -225,18 +237,25 @@ class ComprehensiveWalletAnalyzer {
     console.log(`Total Estimated Volume: $${totalVolumeMoved.toFixed(2)}`);
     
     // Add volume breakdown by token
-    console.log('\n📊 VOLUME BREAKDOWN BY TOKEN');
+    console.log('\n📊 DETAILED VOLUME BREAKDOWN BY TOKEN');
+    console.log('─'.repeat(70));
+    console.log('Token     Token Volume         USD Volume    % of Total   Method');
     console.log('─'.repeat(70));
     
     volumeData.sort((a, b) => b.volumeValue - a.volumeValue);
     
     for (const vd of volumeData) {
-      const percentage = (vd.volumeValue / totalVolumeMoved * 100);
+      const percentage = totalVolumeMoved > 0 ? (vd.volumeValue / totalVolumeMoved * 100) : 0;
+      const tokenVolumeStr = vd.estimatedVolume < 1 
+        ? vd.estimatedVolume.toExponential(2)
+        : vd.estimatedVolume.toLocaleString(undefined, {maximumFractionDigits: 2});
+      
       console.log(
         `${vd.token.padEnd(10)}` +
+        `${tokenVolumeStr.padStart(18)} ` +
         `$${vd.volumeValue.toFixed(2).padStart(12)} ` +
-        `(${percentage.toFixed(1)}%)`.padStart(10) +
-        ` - ${vd.estimatedVolume.toFixed(2)} tokens moved`
+        `${percentage.toFixed(1).padStart(10)}%` +
+        `   ${vd.calculationMethod.padStart(10)}`
       );
     }
     

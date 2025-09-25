@@ -1,0 +1,72 @@
+{
+  "wallet": "eth|Ce74B68cd1e9786F4BD3b9f7152D6151695A0bA5",
+  "analysisDate": "2025-09-25T09:57:10.758Z",
+  "startDate": "2025-09-23T00:00:00.000Z",
+  "realData": {
+    "balances": {
+      "GALA": {
+        "quantity": 33487.8322729,
+        "decimals": 8,
+        "raw": "33487.8322729"
+      },
+      "GUSDC": {
+        "quantity": 0.000187,
+        "decimals": 6,
+        "raw": "0.000187"
+      },
+      "GWETH": {
+        "quantity": 0.000011061287461419,
+        "decimals": 18,
+        "raw": "0.000011061287461419"
+      }
+    },
+    "prices": {
+      "GALA": 0.0148448,
+      "GWETH": 4025.71,
+      "ETH": 4025.71,
+      "GUSDC": 0.999795,
+      "USDC": 0.999795,
+      "GUSDT": 1,
+      "USDT": 1
+    },
+    "transactions": [],
+    "statistics": {
+      "totalValue": 497.1648890219572,
+      "holdings": [
+        {
+          "token": "GALA",
+          "quantity": 33487.8322729,
+          "decimals": 8,
+          "price": 0.0148448,
+          "value": 497.1201725247459,
+          "raw": "33487.8322729"
+        },
+        {
+          "token": "GWETH",
+          "quantity": 0.000011061287461419,
+          "decimals": 18,
+          "price": 4025.71,
+          "value": 0.04452953554630908,
+          "raw": "0.000011061287461419"
+        },
+        {
+          "token": "GUSDC",
+          "quantity": 0.000187,
+          "decimals": 6,
+          "price": 0.999795,
+          "value": 0.000186961665,
+          "raw": "0.000187"
+        }
+      ],
+      "transactionCount": 0,
+      "hasTransactionData": false,
+      "dataTimestamp": "2025-09-25T09:57:10.758Z"
+    }
+  },
+  "metadata": {
+    "note": "This analysis contains only real fetched data, no estimates or calculations",
+    "balanceSource": "GalaChain DEX API",
+    "priceSource": "CoinGecko API",
+    "transactionSource": "unavailable"
+  }
+}
