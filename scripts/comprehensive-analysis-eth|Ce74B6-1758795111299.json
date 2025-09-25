@@ -1,0 +1,199 @@
+{
+  "wallet": "eth|Ce74B68cd1e9786F4BD3b9f7152D6151695A0bA5",
+  "analysisDate": "2025-09-25T10:11:51.299Z",
+  "startDate": "2025-09-23T00:00:00.000Z",
+  "balances": {
+    "GALA": 33487.8322729,
+    "GUSDC": 0.000187,
+    "GWETH": 0.000011061287461419
+  },
+  "prices": {
+    "GALA": 0.01485943,
+    "GWETH": 4028.47,
+    "ETH": 4028.47,
+    "GUSDC": 0.999796,
+    "USDC": 0.999796,
+    "GUSDT": 1,
+    "USDT": 1
+  },
+  "transactions": [
+    {
+      "hash": "01d98ea2994562b3bfd6f487c78c7a235d12ddbd16985eebcd42e8b679b8cbe9",
+      "method": "DexV3Contract:BatchSubmit:Swap",
+      "from": "service|pool_6....0b2a",
+      "to": "eth|Ce74B6....0bA5",
+      "age": "52 minutes",
+      "token": "GALA",
+      "amount": "0.24",
+      "fee": "-",
+      "type": "swap",
+      "timestamp": "52 minutes"
+    },
+    {
+      "hash": "01d98ea2994562b3bfd6f487c78c7a235d12ddbd16985eebcd42e8b679b8cbe9",
+      "method": "DexV3Contract:BatchSubmit:Swap",
+      "from": "eth|Ce74B6....0bA5",
+      "to": "service|pool_6....0b2a",
+      "age": "52 minutes",
+      "token": "GUSDC",
+      "amount": "0.00355",
+      "fee": "-",
+      "type": "swap",
+      "timestamp": "52 minutes"
+    },
+    {
+      "hash": "01d98ea2994562b3bfd6f487c78c7a235d12ddbd16985eebcd42e8b679b8cbe9",
+      "method": "DexV3Contract:BatchSubmit",
+      "from": "eth|Ce74B6....0bA5",
+      "to": "-",
+      "age": "52 minutes",
+      "token": "GALA",
+      "amount": "0",
+      "fee": "1",
+      "timestamp": "52 minutes"
+    },
+    {
+      "hash": "2ba46b92af05af14f7d5c2326b3770d74a966e3bb648d32061d172f5fb0e4b4f",
+      "method": "DexV3Contract:BatchSubmit:Swap",
+      "from": "service|pool_6....0b2a",
+      "to": "eth|Ce74B6....0bA5",
+      "age": "54 minutes",
+      "token": "GALA",
+      "amount": "4.75",
+      "fee": "-",
+      "type": "swap",
+      "timestamp": "54 minutes"
+    },
+    {
+      "hash": "2ba46b92af05af14f7d5c2326b3770d74a966e3bb648d32061d172f5fb0e4b4f",
+      "method": "DexV3Contract:BatchSubmit:Swap",
+      "from": "eth|Ce74B6....0bA5",
+      "to": "service|pool_6....0b2a",
+      "age": "54 minutes",
+      "token": "GUSDC",
+      "amount": "0.07",
+      "fee": "-",
+      "type": "swap",
+      "timestamp": "54 minutes"
+    },
+    {
+      "hash": "2ba46b92af05af14f7d5c2326b3770d74a966e3bb648d32061d172f5fb0e4b4f",
+      "method": "DexV3Contract:BatchSubmit",
+      "from": "eth|Ce74B6....0bA5",
+      "to": "-",
+      "age": "54 minutes",
+      "token": "GALA",
+      "amount": "0",
+      "fee": "1",
+      "timestamp": "54 minutes"
+    },
+    {
+      "hash": "2e6bd5213c0fd000dc25dedd3f01f8549fd63a712e7ea1a7a34ee0f103da289f",
+      "method": "DexV3Contract:BatchSubmit:Swap",
+      "from": "service|pool_6....0b2a",
+      "to": "eth|Ce74B6....0bA5",
+      "age": "56 minutes",
+      "token": "GALA",
+      "amount": "94.92",
+      "fee": "-",
+      "type": "swap",
+      "timestamp": "56 minutes"
+    },
+    {
+      "hash": "2e6bd5213c0fd000dc25dedd3f01f8549fd63a712e7ea1a7a34ee0f103da289f",
+      "method": "DexV3Contract:BatchSubmit:Swap",
+      "from": "eth|Ce74B6....0bA5",
+      "to": "service|pool_6....0b2a",
+      "age": "56 minutes",
+      "token": "GUSDC",
+      "amount": "1.42",
+      "fee": "-",
+      "type": "swap",
+      "timestamp": "56 minutes"
+    },
+    {
+      "hash": "2e6bd5213c0fd000dc25dedd3f01f8549fd63a712e7ea1a7a34ee0f103da289f",
+      "method": "DexV3Contract:BatchSubmit",
+      "from": "eth|Ce74B6....0bA5",
+      "to": "-",
+      "age": "56 minutes",
+      "token": "GALA",
+      "amount": "0",
+      "fee": "1",
+      "timestamp": "56 minutes"
+    },
+    {
+      "hash": "05b359285f2733b58f6bbe76ec765b80ece07d6bf3b2703edb61735556d9304d",
+      "method": "DexV3Contract:BatchSubmit:Swap",
+      "from": "service|pool_6....0b2a",
+      "to": "eth|Ce74B6....0bA5",
+      "age": "58 minutes",
+      "token": "GUSDC",
+      "amount": "1.50",
+      "fee": "-",
+      "type": "swap",
+      "timestamp": "58 minutes"
+    }
+  ],
+  "statistics": {
+    "totalValue": 497.6548465374501,
+    "holdings": [
+      {
+        "token": "GALA",
+        "quantity": 33487.8322729,
+        "price": 0.01485943,
+        "value": 497.6100995108984,
+        "percentage": 99.99100842142641
+      },
+      {
+        "token": "GWETH",
+        "quantity": 0.000011061287461419,
+        "price": 4028.47,
+        "value": 0.0445600646997026,
+        "percentage": 0.00895400999502761
+      },
+      {
+        "token": "GUSDC",
+        "quantity": 0.000187,
+        "price": 0.999796,
+        "value": 0.00018696185199999998,
+        "percentage": 0.000037568578564205845
+      }
+    ],
+    "estimatedInitialValue": 547.3711094619883,
+    "pnl": -49.71626292453823,
+    "pnlPercent": -9.082734193517155,
+    "largestPosition": "GALA",
+    "concentration": 100,
+    "riskLevel": "Very High",
+    "diversificationScore": 2.5,
+    "activeTokens": 1,
+    "volumeData": [
+      {
+        "token": "GALA",
+        "currentHolding": 33487.8322729,
+        "estimatedVolume": 40185.398727479995,
+        "volumeValue": 597.132119413078,
+        "calculationMethod": "Trading"
+      },
+      {
+        "token": "GWETH",
+        "currentHolding": 0.000011061287461419,
+        "estimatedVolume": 0.0011061287461419,
+        "volumeValue": 4.4560064699702595,
+        "calculationMethod": "Residual"
+      },
+      {
+        "token": "GUSDC",
+        "currentHolding": 0.000187,
+        "estimatedVolume": 0.018699999999999998,
+        "volumeValue": 0.0186961852,
+        "calculationMethod": "Residual"
+      }
+    ],
+    "totalVolumeMoved": 601.6068220682483,
+    "estimatedTrades": 12,
+    "avgTradeSize": 50.133901839020695,
+    "volumeToPortfolioRatio": 1.2088836796307088
+  }
+}

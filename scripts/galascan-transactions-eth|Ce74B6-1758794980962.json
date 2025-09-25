@@ -1,0 +1,130 @@
+{
+  "wallet": "eth|Ce74B68cd1e9786F4BD3b9f7152D6151695A0bA5",
+  "analysisDate": "2025-09-25T10:09:40.962Z",
+  "period": {
+    "start": "2025-09-01T00:00:00.000Z",
+    "end": "2025-09-25T10:09:38.534Z"
+  },
+  "statistics": {
+    "totalTransactions": 10,
+    "swapCount": 7,
+    "successCount": 0,
+    "failedCount": 0,
+    "tokenVolumes": {},
+    "tradingPairs": {},
+    "totalVolumeUSD": 0
+  },
+  "transactionCount": 10,
+  "transactions": [
+    {
+      "hash": null,
+      "timestamp": "DexV3Contract:BatchSubmit:Swap",
+      "type": "DexV3Contract:BatchSubmit:Swap",
+      "tokenIn": null,
+      "tokenOut": null,
+      "amountIn": null,
+      "amountOut": null,
+      "status": null,
+      "fee": null
+    },
+    {
+      "hash": null,
+      "timestamp": "DexV3Contract:BatchSubmit:Swap",
+      "type": "DexV3Contract:BatchSubmit:Swap",
+      "tokenIn": null,
+      "tokenOut": null,
+      "amountIn": null,
+      "amountOut": null,
+      "status": null,
+      "fee": null
+    },
+    {
+      "hash": null,
+      "timestamp": "DexV3Contract:BatchSubmit",
+      "type": null,
+      "tokenIn": null,
+      "tokenOut": null,
+      "amountIn": null,
+      "amountOut": null,
+      "status": null,
+      "fee": null
+    },
+    {
+      "hash": null,
+      "timestamp": "DexV3Contract:BatchSubmit:Swap",
+      "type": "DexV3Contract:BatchSubmit:Swap",
+      "tokenIn": null,
+      "tokenOut": null,
+      "amountIn": null,
+      "amountOut": null,
+      "status": null,
+      "fee": null
+    },
+    {
+      "hash": null,
+      "timestamp": "DexV3Contract:BatchSubmit:Swap",
+      "type": "DexV3Contract:BatchSubmit:Swap",
+      "tokenIn": null,
+      "tokenOut": null,
+      "amountIn": null,
+      "amountOut": null,
+      "status": null,
+      "fee": null
+    },
+    {
+      "hash": null,
+      "timestamp": "DexV3Contract:BatchSubmit",
+      "type": null,
+      "tokenIn": null,
+      "tokenOut": null,
+      "amountIn": null,
+      "amountOut": null,
+      "status": null,
+      "fee": null
+    },
+    {
+      "hash": null,
+      "timestamp": "DexV3Contract:BatchSubmit:Swap",
+      "type": "DexV3Contract:BatchSubmit:Swap",
+      "tokenIn": null,
+      "tokenOut": null,
+      "amountIn": null,
+      "amountOut": null,
+      "status": null,
+      "fee": null
+    },
+    {
+      "hash": null,
+      "timestamp": "DexV3Contract:BatchSubmit:Swap",
+      "type": "DexV3Contract:BatchSubmit:Swap",
+      "tokenIn": null,
+      "tokenOut": null,
+      "amountIn": null,
+      "amountOut": null,
+      "status": null,
+      "fee": null
+    },
+    {
+      "hash": null,
+      "timestamp": "DexV3Contract:BatchSubmit",
+      "type": null,
+      "tokenIn": null,
+      "tokenOut": null,
+      "amountIn": null,
+      "amountOut": null,
+      "status": null,
+      "fee": null
+    },
+    {
+      "hash": null,
+      "timestamp": "DexV3Contract:BatchSubmit:Swap",
+      "type": "DexV3Contract:BatchSubmit:Swap",
+      "tokenIn": null,
+      "tokenOut": null,
+      "amountIn": null,
+      "amountOut": null,
+      "status": null,
+      "fee": null
+    }
+  ]
+}

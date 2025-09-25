@@ -7,6 +7,7 @@
 
 import fetch from 'node-fetch';
 import fs from 'fs/promises';
+import puppeteer from 'puppeteer';
 
 class ComprehensiveWalletAnalyzer {
   constructor(walletAddress, startDate) {
@@ -52,21 +53,114 @@ class ComprehensiveWalletAnalyzer {
   }
 
   async fetchTransactionHistory() {
-    console.log('\n📜 Checking transaction history...');
+    console.log('\n📜 Fetching transaction history from GalaScan...');
     
-    // Note: GalaScan requires JavaScript rendering to display transactions
-    // Transaction data is not available from public APIs without authentication
+    const browser = await puppeteer.launch({
+      headless: 'new',
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
     
-    const galaScanUrl = `https://galascan.gala.com/wallet/${this.walletAddress.replace('|', '%7C')}`;
-    console.log(`  Transaction history available at: ${galaScanUrl}`);
-    console.log('  Note: Public APIs do not provide transaction history');
-    console.log('  Options for getting transaction data:');
-    console.log('    1. Use authenticated API with API key');
-    console.log('    2. Export transactions from GalaScan manually');
-    console.log('    3. Use browser automation tools (Puppeteer/Playwright)');
-    
-    // For now, we'll work with empty transactions
-    this.data.transactions = [];
+    try {
+      const page = await browser.newPage();
+      await page.setViewport({ width: 1920, height: 1080 });
+      await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36');
+      
+      // Navigate to wallet page
+      const url = `https://galascan.gala.com/wallet/${this.walletAddress.replace('|', '%7C')}`;
+      console.log(`  Navigating to: ${url}`);
+      
+      await page.goto(url, { 
+        waitUntil: 'networkidle2',
+        timeout: 30000 
+      });
+      
+      // Wait for transaction table to load
+      console.log('  Waiting for transactions to load...');
+      try {
+        await page.waitForSelector('tbody tr', { timeout: 5000 });
+      } catch (e) {
+        console.log('  No transaction table found');
+        this.data.transactions = [];
+        return;
+      }
+      
+      // Extract transaction data from the table
+      const transactions = await page.evaluate(() => {
+        const rows = document.querySelectorAll('tbody tr');
+        const txs = [];
+        
+        rows.forEach((row) => {
+          const cells = Array.from(row.querySelectorAll('td'));
+          if (cells.length >= 7) {
+            // Based on the screenshot structure:
+            // 0: Transaction Hash, 1: Method, 2: From, 3: To, 4: Age, 5: Token, 6: Amount, 7: Fee
+            const tx = {
+              hash: cells[0]?.textContent?.trim() || '',
+              method: cells[1]?.textContent?.trim() || '',
+              from: cells[2]?.textContent?.trim() || '',
+              to: cells[3]?.textContent?.trim() || '',
+              age: cells[4]?.textContent?.trim() || '',
+              token: cells[5]?.textContent?.trim() || '',
+              amount: cells[6]?.textContent?.trim() || '',
+              fee: cells[7]?.textContent?.trim() || ''
+            };
+            
+            // Parse swap details from method
+            if (tx.method.includes('Swap')) {
+              tx.type = 'swap';
+              
+              // Look for from/to details in the from/to fields
+              if (tx.from.includes('→') || tx.from.includes('->')) {
+                const parts = tx.from.split(/→|->/).map(s => s.trim());
+                if (parts.length === 2) {
+                  const fromMatch = parts[0].match(/(\d+\.?\d*)\s*(\w+)/);
+                  const toMatch = parts[1].match(/(\d+\.?\d*)\s*(\w+)/);
+                  if (fromMatch) {
+                    tx.amountIn = parseFloat(fromMatch[1]);
+                    tx.tokenIn = fromMatch[2];
+                  }
+                  if (toMatch) {
+                    tx.amountOut = parseFloat(toMatch[1]);
+                    tx.tokenOut = toMatch[2];
+                  }
+                }
+              }
+            }
+            
+            // Parse timestamp from age (e.g., "49 minutes" -> approximate time)
+            if (tx.age) {
+              tx.timestamp = tx.age;
+            }
+            
+            txs.push(tx);
+          }
+        });
+        
+        return txs;
+      });
+      
+      console.log(`  ✅ Found ${transactions.length} transactions`);
+      this.data.transactions = transactions;
+      
+      // Try to load more if there's pagination
+      const hasLoadMore = await page.evaluate(() => {
+        const buttons = Array.from(document.querySelectorAll('button'));
+        return buttons.some(btn => 
+          btn.textContent.toLowerCase().includes('load more') ||
+          btn.textContent.toLowerCase().includes('next')
+        );
+      });
+      
+      if (hasLoadMore) {
+        console.log('  📄 More transactions available (pagination detected)');
+      }
+      
+    } catch (error) {
+      console.log(`  ❌ Error fetching transactions: ${error.message}`);
+      this.data.transactions = [];
+    } finally {
+      await browser.close();
+    }
   }
 
   async fetchWalletBalances() {
@@ -138,19 +232,51 @@ class ComprehensiveWalletAnalyzer {
       console.log('─'.repeat(60));
       console.log(`Total Transactions Found: ${this.data.transactions.length}`);
       
-      // Filter transactions by date if timestamps are available
-      const filteredTxs = this.data.transactions.filter(tx => {
-        if (!tx.timestamp) return true; // Include if no timestamp
-        // Try to parse the timestamp
+      // Show sample transactions for debugging
+      console.log('\nSample transactions (first 3):');
+      for (let i = 0; i < Math.min(3, this.data.transactions.length); i++) {
+        const tx = this.data.transactions[i];
+        console.log(`  ${i+1}. Hash: ${tx.hash?.slice(0, 10)}... | Method: ${tx.method} | Age: ${tx.age} | Token: ${tx.token} ${tx.amount}`);
+      }
+      
+      // Filter transactions by date using age field
+      const filteredTxs = this.data.transactions.filter((tx, i) => {
+        if (!tx.age || tx.age === '') return true; // Include if no age info
+        
+        // Parse relative time (e.g., "49 minutes")
         try {
-          const txDate = new Date(tx.timestamp);
-          return txDate >= this.startDate;
-        } catch {
+          const now = new Date();
+          const ageMatch = tx.age.match(/(\d+)\s*(second|minute|hour|day|week|month)s?/);
+          
+          if (ageMatch) {
+            const amount = parseInt(ageMatch[1]);
+            const unit = ageMatch[2];
+            let txDate = new Date();
+            
+            switch (unit) {
+              case 'second': txDate = new Date(now - amount * 1000); break;
+              case 'minute': txDate = new Date(now - amount * 60 * 1000); break;
+              case 'hour': txDate = new Date(now - amount * 60 * 60 * 1000); break;
+              case 'day': txDate = new Date(now - amount * 24 * 60 * 60 * 1000); break;
+              case 'week': txDate = new Date(now - amount * 7 * 24 * 60 * 60 * 1000); break;
+              case 'month': txDate = new Date(now - amount * 30 * 24 * 60 * 60 * 1000); break;
+            }
+            
+            const inRange = txDate >= this.startDate;
+            if (!inRange && i < 3) {
+              console.log(`    Filtered out: ${tx.age} (${txDate.toISOString().split('T')[0]} < ${this.startDate.toISOString().split('T')[0]})`);
+            }
+            return inRange;
+          }
+          
+          return true;
+        } catch (e) {
+          console.log(`  Error parsing age: ${tx.age}`, e.message);
           return true; // Include if can't parse
         }
       });
       
-      console.log(`Transactions in Period: ${filteredTxs.length}`);
+      console.log(`\nTransactions in Period: ${filteredTxs.length} (from ${this.data.transactions.length} total)`);
       
       // Count transaction types
       const swapTxs = filteredTxs.filter(tx => 
