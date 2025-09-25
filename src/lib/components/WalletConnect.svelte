@@ -46,6 +46,12 @@
 
       showModal = false;
       privateKey = '';
+      
+      // Trigger a balance refresh after connection
+      setTimeout(async () => {
+        console.log('[WalletConnect] Triggering balance refresh after connection');
+        await walletService.updateBalances();
+      }, 1000);
     } catch (err: any) {
       console.error('[WalletConnect] Connection error:', err);
       error = err.message || 'Failed to connect wallet';

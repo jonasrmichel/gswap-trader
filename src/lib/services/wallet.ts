@@ -397,17 +397,33 @@ class WalletService {
         const response = await fetch(`https://dex-backend-prod1.defi.gala.com/user/assets?address=${galaChainAddress}&page=1&limit=20`);
         if (response.ok) {
           const result = await response.json();
-          // The API returns data.token (not data.tokens)
-          if (result.data && result.data.token && result.data.token.length > 0) {
-            console.log('[Wallet] GalaChain assets found:', result.data.token);
+          console.log('[Wallet] GalaChain API response:', JSON.stringify(result, null, 2));
+          
+          // Check multiple possible response structures
+          let tokens = [];
+          if (result.data?.token) {
+            tokens = Array.isArray(result.data.token) ? result.data.token : [result.data.token];
+          } else if (result.data?.tokens) {
+            tokens = Array.isArray(result.data.tokens) ? result.data.tokens : [result.data.tokens];
+          } else if (result.tokens) {
+            tokens = Array.isArray(result.tokens) ? result.tokens : [result.tokens];
+          } else if (result.token) {
+            tokens = Array.isArray(result.token) ? result.token : [result.token];
+          }
+          
+          if (tokens.length > 0) {
+            console.log('[Wallet] GalaChain tokens found:', tokens);
 
             // Add GalaChain tokens to balances
-            for (const token of result.data.token) {
+            for (const token of tokens) {
+              if (!token || !token.symbol) continue;
+              
               // Try to get token price for value calculation
               let value = 0;
               try {
                 const price = await this.fetchTokenPrice(token.symbol);
-                value = parseFloat(token.quantity) * price;
+                const quantity = parseFloat(token.quantity || token.balance || '0');
+                value = quantity * price;
               } catch (e) {
                 // Price not available
               }
@@ -416,13 +432,17 @@ class WalletService {
               // The tokens from GalaChain already have the G prefix (GUSDC, GWETH, etc)
               balances.push({
                 token: token.symbol,
-                balance: token.quantity,
+                balance: token.quantity || token.balance || '0',
                 value: value
               });
               
-              console.log(`[Wallet] Added GalaChain token: ${token.symbol} balance: ${token.quantity}`);
+              console.log(`[Wallet] Added GalaChain token: ${token.symbol} balance: ${token.quantity || token.balance || '0'}`);
             }
+          } else {
+            console.log('[Wallet] No tokens found in GalaChain API response');
           }
+        } else {
+          console.log('[Wallet] GalaChain API returned status:', response.status);
         }
       } catch (galaError) {
         console.log('[Wallet] Could not fetch GalaChain balances:', galaError);

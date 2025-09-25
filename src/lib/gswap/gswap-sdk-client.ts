@@ -3,6 +3,7 @@ import type { LiquidityPool, SwapParams } from './types';
 import { CoinGeckoService } from '../services/coingecko';
 import { MetaMaskSigner } from './metamask-signer';
 import { ethers } from 'ethers';
+import { transactionResolver } from './transaction-resolver';
 
 // Helper functions for token format conversion
 export function formatTokenForGSwap(symbol: string): string {
@@ -151,6 +152,51 @@ export class GSwapSDKClient {
     return this.connected;
   }
 
+  /**
+   * Get the blockchain hash for a transaction ID
+   * @param transactionId The GalaChain transaction ID
+   * @param timeout Maximum time to wait in milliseconds
+   * @returns The blockchain hash if found, null otherwise
+   */
+  async getBlockchainHash(transactionId: string, timeout: number = 600000): Promise<string | null> {
+    console.log(`[GSwapSDKClient] Resolving blockchain hash for ${transactionId}`);
+    
+    try {
+      // First ensure transaction resolver is connected
+      if (!transactionResolver.isConnected()) {
+        await transactionResolver.connect();
+      }
+      
+      // Try to resolve the blockchain hash
+      const hash = await transactionResolver.resolveToBlockchainHash(transactionId, {
+        useSocket: true,
+        useApi: true,
+        timeout
+      });
+      
+      if (hash) {
+        console.log(`[GSwapSDKClient] Resolved to blockchain hash: ${hash}`);
+        console.log(`[GSwapSDKClient] View on GalaScan: ${transactionResolver.getGalaScanUrl(hash)}`);
+        return hash;
+      } else {
+        console.log(`[GSwapSDKClient] Could not resolve blockchain hash for ${transactionId}`);
+        return null;
+      }
+    } catch (error) {
+      console.error('[GSwapSDKClient] Error resolving blockchain hash:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get transaction status including blockchain hash
+   * @param transactionId The GalaChain transaction ID
+   * @returns Transaction status or null if not found
+   */
+  async getTransactionStatus(transactionId: string) {
+    return transactionResolver.queryTransactionStatus(transactionId);
+  }
+
 
   async getBalance(tokenAddress: string, walletAddress: string): Promise<string> {
     if (!this.gswap) {
@@ -204,27 +250,66 @@ export class GSwapSDKClient {
         ? `eth|${walletAddress.slice(2).toLowerCase()}`
         : walletAddress;
 
-      // Silently try to fetch assets - don't log unless successful
-      const result = await gswapInstance.assets.getUserAssets(galaChainAddress, 1, 20);
-      console.log('[GSwapSDKClient] Assets fetched successfully');
+      console.log('[GSwapSDKClient] Fetching assets for:', galaChainAddress);
       
-      // If no tokens, try fetching specific token balances
-      if (!result.tokens || result.tokens.length === 0) {
-        console.log('[GSwapSDKClient] No tokens found, using default balances');
+      // Try using the SDK first
+      try {
+        const result = await gswapInstance.assets.getUserAssets(galaChainAddress, 1, 20);
+        console.log('[GSwapSDKClient] Assets fetched via SDK:', result);
         
-        // Return default tokens immediately
-        return { 
-          tokens: [
-            { symbol: 'GALA', quantity: '0', decimals: 8 },
-            { symbol: 'GWETH', quantity: '0', decimals: 8 },
-            { symbol: 'GUSDC', quantity: '0', decimals: 8 },
-            { symbol: 'GUSDT', quantity: '0', decimals: 8 }
-          ], 
-          count: 4 
-        };
+        if (result.tokens && result.tokens.length > 0) {
+          return result;
+        }
+      } catch (sdkError) {
+        console.log('[GSwapSDKClient] SDK fetch failed, trying direct API');
       }
       
-      return result;
+      // Fallback to direct API call
+      const response = await fetch(
+        `https://dex-backend-prod1.defi.gala.com/user/assets?address=${galaChainAddress}&page=1&limit=20`
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('[GSwapSDKClient] Direct API response:', data);
+        
+        // Parse the response - check multiple possible structures
+        let tokens = [];
+        if (data.data?.token) {
+          tokens = Array.isArray(data.data.token) ? data.data.token : [data.data.token];
+        } else if (data.data?.tokens) {
+          tokens = Array.isArray(data.data.tokens) ? data.data.tokens : [data.data.tokens];
+        } else if (data.tokens) {
+          tokens = Array.isArray(data.tokens) ? data.tokens : [data.tokens];
+        } else if (data.token) {
+          tokens = Array.isArray(data.token) ? data.token : [data.token];
+        }
+        
+        // Map to expected format
+        const mappedTokens = tokens.map((t: any) => ({
+          symbol: t.symbol || t.token || '',
+          quantity: t.quantity || t.balance || '0',
+          decimals: t.decimals || 8
+        })).filter((t: any) => t.symbol);
+        
+        if (mappedTokens.length > 0) {
+          console.log('[GSwapSDKClient] Returning tokens from API:', mappedTokens);
+          return { tokens: mappedTokens, count: mappedTokens.length };
+        }
+      }
+      
+      // If we still have no tokens, return defaults
+      console.log('[GSwapSDKClient] No tokens found, using default balances');
+      return { 
+        tokens: [
+          { symbol: 'GALA', quantity: '0', decimals: 8 },
+          { symbol: 'GWETH', quantity: '0', decimals: 8 },
+          { symbol: 'GUSDC', quantity: '0', decimals: 8 },
+          { symbol: 'GUSDT', quantity: '0', decimals: 8 }
+        ], 
+        count: 4 
+      };
+      
     } catch (error: any) {
       // Check if this is a 400 error (likely unregistered wallet)
       if (error?.message?.includes('400') || error?.message?.includes('Bad Request')) {
@@ -233,8 +318,6 @@ export class GSwapSDKClient {
         // Only log non-network errors
         console.warn('[GSwapSDKClient] Error fetching assets:', error.message);
       }
-      
-      // Don't try the API fallback again to avoid duplicate 400 errors
       
       // Return default tokens with 0 balance
       return { 

@@ -622,10 +622,33 @@ export class TradingAgent {
 
           this.logger.logSystem(`✅ Live trade submitted to GalaChain!`, 'success');
           
-          // Log transaction ID (we don't have blockchain hash due to SDK limitations)
+          // Log transaction ID initially
           this.logger.logSystem(`📝 Transaction ID: ${txHash}`, 'info');
-          this.logger.logSystem(`✅ Trade executed on GalaChain`, 'success');
-          this.logger.logSystem(`Status: Confirmed on blockchain`, 'info');
+          this.logger.logSystem(`⏳ Waiting for blockchain confirmation...`, 'info');
+          
+          // Poll for the blockchain hash
+          setTimeout(async () => {
+            try {
+              const blockchainHash = await this.client.getBlockchainHash(txHash, 600000);
+              // Only show GalaScan link if we got a different hash (not the same as transaction ID)
+              if (blockchainHash && blockchainHash !== txHash) {
+                this.logger.logSystem(`✅ Trade confirmed on blockchain`, 'success');
+                this.logger.logSystem(`📝 Blockchain Hash: ${blockchainHash}`, 'info');
+                this.logger.logSystem(`🔗 View on GalaScan: https://galascan.gala.com/transaction/${blockchainHash}`, 'info');
+                
+                // Update the trade record with blockchain hash
+                trade.blockchainHash = blockchainHash;
+                this.currentTrades.set(trade.id, trade);
+              } else {
+                this.logger.logSystem(`⚠️ Could not get blockchain hash after 10 minutes (transaction may still be processing)`, 'warning');
+                this.logger.logSystem(`📝 Track with transaction ID: ${txHash}`, 'info');
+                this.logger.logSystem(`🔗 View on GalaScan: https://galascan.gala.com/transaction/${txHash}`, 'info');
+              }
+            } catch (error) {
+              console.error('Failed to get blockchain hash:', error);
+              this.logger.logSystem(`⚠️ Error getting blockchain hash, transaction ID: ${txHash}`, 'warning');
+            }
+          }, 5000); // Start polling after 5 seconds
         } catch (swapError: any) {
           trade.status = 'failed';
           this.logger.logError(`Failed to execute swap: ${swapError.message}`, swapError);

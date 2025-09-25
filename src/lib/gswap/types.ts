@@ -61,7 +61,8 @@ export interface Trade {
   priceOut?: number; // Price of output token in USD
   fee?: number;      // Transaction fee
   profit?: number;
-  txHash?: string;
+  txHash?: string;      // Initial transaction ID from GalaChain
+  blockchainHash?: string; // Blockchain hash after confirmation
   status: 'pending' | 'success' | 'failed';
 }
 

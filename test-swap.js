@@ -131,11 +131,8 @@ async function executeTrade() {
       console.log('✅ Transaction confirmed!');
       console.log('📋 Confirmed transaction:', confirmedTx);
 
-      // The confirmed transaction should have the blockchain hash
-      txHash = confirmedTx.transactionHash || confirmedTx.hash || confirmedTx.txHash;
-      if (txHash) {
-        console.log('🔗 View on GalaScan: https://galascan.gala.com/transaction/' + txHash);
-      }
+      // Log confirmed status
+      console.log('✅ Transaction confirmed on blockchain');
     } catch (waitError) {
       console.warn('⚠️ Could not wait for confirmation:', waitError.message);
       // Use transaction ID as fallback
@@ -163,6 +160,9 @@ async function executeTrade() {
       console.warn('⚠️ Could not check final balances:', balanceError.message);
     }
 
+    // Log GalaScan link with transaction ID
+    console.log('🔗 View on GalaScan: https://galascan.gala.com/transaction/' + txHash);
+    
     return txHash;
 
   } catch (error) {
