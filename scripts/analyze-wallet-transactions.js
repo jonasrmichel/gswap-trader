@@ -51,6 +51,24 @@ class ComprehensiveWalletAnalyzer {
     }
   }
 
+  async fetchTransactionHistory() {
+    console.log('\n📜 Checking transaction history...');
+    
+    // Note: GalaScan requires JavaScript rendering to display transactions
+    // Transaction data is not available from public APIs without authentication
+    
+    const galaScanUrl = `https://galascan.gala.com/wallet/${this.walletAddress.replace('|', '%7C')}`;
+    console.log(`  Transaction history available at: ${galaScanUrl}`);
+    console.log('  Note: Public APIs do not provide transaction history');
+    console.log('  Options for getting transaction data:');
+    console.log('    1. Use authenticated API with API key');
+    console.log('    2. Export transactions from GalaScan manually');
+    console.log('    3. Use browser automation tools (Puppeteer/Playwright)');
+    
+    // For now, we'll work with empty transactions
+    this.data.transactions = [];
+  }
+
   async fetchWalletBalances() {
     console.log('\n📊 Fetching wallet balances...');
     
@@ -113,6 +131,111 @@ class ComprehensiveWalletAnalyzer {
     console.log(`Analysis Date: ${new Date().toISOString().split('T')[0]}`);
     console.log(`Period: Since ${this.startDate.toISOString().split('T')[0]}`);
     console.log('');
+    
+    // If we have scraped transactions, analyze them
+    if (this.data.transactions.length > 0) {
+      console.log('📜 TRANSACTION HISTORY (from GalaScan)');
+      console.log('─'.repeat(60));
+      console.log(`Total Transactions Found: ${this.data.transactions.length}`);
+      
+      // Filter transactions by date if timestamps are available
+      const filteredTxs = this.data.transactions.filter(tx => {
+        if (!tx.timestamp) return true; // Include if no timestamp
+        // Try to parse the timestamp
+        try {
+          const txDate = new Date(tx.timestamp);
+          return txDate >= this.startDate;
+        } catch {
+          return true; // Include if can't parse
+        }
+      });
+      
+      console.log(`Transactions in Period: ${filteredTxs.length}`);
+      
+      // Count transaction types
+      const swapTxs = filteredTxs.filter(tx => 
+        tx.type === 'swap' || tx.tokenIn || tx.tokenOut
+      );
+      const successTxs = filteredTxs.filter(tx => 
+        tx.status?.toLowerCase() === 'success'
+      );
+      const failedTxs = filteredTxs.filter(tx => 
+        tx.status?.toLowerCase() === 'failed'
+      );
+      
+      console.log(`Swap Transactions: ${swapTxs.length}`);
+      console.log(`Successful: ${successTxs.length}`);
+      console.log(`Failed: ${failedTxs.length}`);
+      
+      // Calculate actual volumes from transactions
+      const tokenVolumes = {};
+      const tradingPairs = {};
+      let totalVolumeUSD = 0;
+      
+      for (const tx of swapTxs) {
+        // Track token volumes
+        if (tx.tokenIn && tx.amountIn) {
+          const amount = parseFloat(tx.amountIn);
+          if (!isNaN(amount)) {
+            tokenVolumes[tx.tokenIn] = (tokenVolumes[tx.tokenIn] || 0) + amount;
+            // Calculate USD value if price available
+            const price = this.data.prices[tx.tokenIn];
+            if (price) totalVolumeUSD += amount * price;
+          }
+        }
+        if (tx.tokenOut && tx.amountOut) {
+          const amount = parseFloat(tx.amountOut);
+          if (!isNaN(amount)) {
+            tokenVolumes[tx.tokenOut] = (tokenVolumes[tx.tokenOut] || 0) + amount;
+          }
+        }
+        
+        // Track trading pairs
+        if (tx.tokenIn && tx.tokenOut) {
+          const pair = `${tx.tokenIn}/${tx.tokenOut}`;
+          tradingPairs[pair] = (tradingPairs[pair] || 0) + 1;
+        }
+      }
+      
+      if (Object.keys(tokenVolumes).length > 0) {
+        console.log('\n📊 ACTUAL TOKEN VOLUMES (from transactions):');
+        console.log('─'.repeat(60));
+        for (const [token, volume] of Object.entries(tokenVolumes)) {
+          const price = this.data.prices[token] || 0;
+          const usdValue = volume * price;
+          console.log(`${token.padEnd(10)} ${volume.toFixed(6).padStart(15)} tokens   $${usdValue.toFixed(2).padStart(10)}`);
+        }
+      }
+      
+      if (Object.keys(tradingPairs).length > 0) {
+        console.log('\n🔄 TRADING PAIRS:');
+        console.log('─'.repeat(60));
+        const sortedPairs = Object.entries(tradingPairs).sort((a, b) => b[1] - a[1]);
+        for (const [pair, count] of sortedPairs.slice(0, 5)) {
+          console.log(`${pair.padEnd(20)} ${count} trades`);
+        }
+      }
+      
+      if (totalVolumeUSD > 0) {
+        console.log('\n💰 TOTAL VOLUME');
+        console.log('─'.repeat(60));
+        console.log(`Total Volume (USD): $${totalVolumeUSD.toFixed(2)}`);
+        console.log(`Average Trade Size: $${(totalVolumeUSD / swapTxs.length).toFixed(2)}`);
+      }
+      
+      // Store actual transaction statistics
+      this.data.statistics.actualTransactionData = {
+        totalTransactions: filteredTxs.length,
+        swapCount: swapTxs.length,
+        successCount: successTxs.length,
+        failedCount: failedTxs.length,
+        tokenVolumes,
+        tradingPairs,
+        totalVolumeUSD
+      };
+      
+      console.log('');
+    }
 
     // Calculate portfolio value
     let totalValue = 0;
@@ -374,6 +497,7 @@ class ComprehensiveWalletAnalyzer {
     try {
       await this.fetchTokenPrices();
       await this.fetchWalletBalances();
+      await this.fetchTransactionHistory();
       
       if (Object.keys(this.data.balances).length === 0) {
         console.log('\n⚠️ No balances found. Please check:');

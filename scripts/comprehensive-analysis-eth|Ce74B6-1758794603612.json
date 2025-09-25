@@ -1,0 +1,81 @@
+{
+  "wallet": "eth|Ce74B68cd1e9786F4BD3b9f7152D6151695A0bA5",
+  "analysisDate": "2025-09-25T10:03:23.612Z",
+  "startDate": "2025-09-23T00:00:00.000Z",
+  "balances": {
+    "GALA": 33487.8322729,
+    "GUSDC": 0.000187,
+    "GWETH": 0.000011061287461419
+  },
+  "prices": {
+    "GALA": 0.01481981,
+    "GWETH": 4023.18,
+    "ETH": 4023.18,
+    "GUSDC": 0.999797,
+    "USDC": 0.999797,
+    "GUSDT": 1,
+    "USDT": 1
+  },
+  "transactions": [],
+  "statistics": {
+    "totalValue": 496.3280001087741,
+    "holdings": [
+      {
+        "token": "GALA",
+        "quantity": 33487.8322729,
+        "price": 0.01481981,
+        "value": 496.2833115962461,
+        "percentage": 99.99099617339377
+      },
+      {
+        "token": "GWETH",
+        "quantity": 0.000011061287461419,
+        "price": 4023.18,
+        "value": 0.04450155048903169,
+        "percentage": 0.008966157556954037
+      },
+      {
+        "token": "GUSDC",
+        "quantity": 0.000187,
+        "price": 0.999797,
+        "value": 0.000186962039,
+        "percentage": 0.00003766904928978938
+      }
+    ],
+    "estimatedInitialValue": 545.9116427558708,
+    "pnl": -49.583642647096724,
+    "pnlPercent": -9.082723056938043,
+    "largestPosition": "GALA",
+    "concentration": 100,
+    "riskLevel": "Very High",
+    "diversificationScore": 2.5,
+    "activeTokens": 1,
+    "volumeData": [
+      {
+        "token": "GALA",
+        "currentHolding": 33487.8322729,
+        "estimatedVolume": 40185.398727479995,
+        "volumeValue": 595.5399739154952,
+        "calculationMethod": "Trading"
+      },
+      {
+        "token": "GWETH",
+        "currentHolding": 0.000011061287461419,
+        "estimatedVolume": 0.0011061287461419,
+        "volumeValue": 4.450155048903169,
+        "calculationMethod": "Residual"
+      },
+      {
+        "token": "GUSDC",
+        "currentHolding": 0.000187,
+        "estimatedVolume": 0.018699999999999998,
+        "volumeValue": 0.0186962039,
+        "calculationMethod": "Residual"
+      }
+    ],
+    "totalVolumeMoved": 600.0088251682985,
+    "estimatedTrades": 12,
+    "avgTradeSize": 50.00073543069154,
+    "volumeToPortfolioRatio": 1.208895780686969
+  }
+}
